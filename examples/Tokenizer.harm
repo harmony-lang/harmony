@@ -1,0 +1,86 @@
+module Tokenizer
+
+import Console.IO as IO
+import Data.Char as Char
+import Data.Maybe as Maybe
+import Data.Result as Result
+import Data.String as String
+
+enum Token
+    = TkNumber(int)
+    | TkPlus
+    | TkMinus
+    | TkTimes
+    | TkDiv
+    | TkLParen
+    | TkRParen
+    | TkError(string)
+
+fun tokenize_input(input: string, index: int, tokens: [Token]) -> Result<[Token], string> =
+    case String.length(input) of
+        | 0 => Success(tokens)
+        | else => case String.get(input, index) of
+            | Just(c) => case Char.isDigit(c) of
+                | true => tokenize_input(input, index + 1, tokens ++ [TkNumber(Char.toInt(c))])
+                | false => case c of
+                    | '+' => tokenize_input(input, index + 1, tokens ++ [TkPlus])
+                    | '-' => tokenize_input(input, index + 1, tokens ++ [TkMinus])
+                    | '*' => tokenize_input(input, index + 1, tokens ++ [TkTimes])
+                    | '/' => tokenize_input(input, index + 1, tokens ++ [TkDiv])
+                    | '(' => tokenize_input(input, index + 1, tokens ++ [TkLParen])
+                    | ')' => tokenize_input(input, index + 1, tokens ++ [TkRParen])
+                    | else => tokenize_input(input, index + 1, tokens ++ [TkError("Unexpected character")])
+                end
+            end
+            | Nothing => tokenize_input(input, index + 1, tokens ++ [TkError("Unexpected end of input")])
+        end
+    end
+
+fun tokenize(input: string) -> Result<[Token], string> =
+    tokenize_input(input, 0, [])
+
+enum Expression
+    = ExprNumber(int)
+    | ExprAdd(Expression, Expression)
+    | ExprSub(Expression, Expression)
+    | ExprMul(Expression, Expression)
+    | ExprDiv(Expression, Expression)
+
+fun parse(tokens: [Token]) -> Result<Expression, string> =
+    case tokens of
+        | [] => Failure("Unexpected end of input")
+        | [TkNumber(n)] => Success(ExprNumber(n))
+        | [TkLParen, ..rest] => case parse(rest) of
+            | Success(expr) => case rest of
+                | [TkRParen, ..rest] => Success(expr)
+                | else => Failure("Expected ')'")
+                end
+            | Failure(error) => Failure(error)
+        end
+        | [TkNumber(n), TkPlus, ..rest] => case parse(rest) of
+            | Success(expr) => Success(ExprAdd(ExprNumber(n), expr))
+            | Failure(error) => Failure(error)
+        end
+        | [TkNumber(n), TkMinus, ..rest] => case parse(rest) of
+            | Success(expr) => Success(ExprSub(ExprNumber(n), expr))
+            | Failure(error) => Failure(error)
+        end
+        | [TkNumber(n), TkTimes, ..rest] => case parse(rest) of
+            | Success(expr) => Success(ExprMul(ExprNumber(n), expr))
+            | Failure(error) => Failure(error)
+        end
+        | [TkNumber(n), TkDiv, ..rest] => case parse(rest) of
+            | Success(expr) => Success(ExprDiv(ExprNumber(n), expr))
+            | Failure(error) => Failure(error)
+        end
+        | else => Failure("Unexpected token")
+    end
+
+fun main =
+    case tokenize("1 + 2 * 3") of
+        | Success(tokens) => case parse(tokens) of
+            | Success(expr) => IO.println(expr)
+            | Failure(error) => IO.println(error)
+        end
+        | Failure(error) => IO.println(error)
+    end

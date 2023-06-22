@@ -1,4 +1,7 @@
 use crate::{
+    ast::Statement,
+    error::{HarmonyError, HarmonyErrorKind},
+    parser::Parser,
     token::{Token, TokenKind},
     tokenizer::Tokenizer,
 };
@@ -33,12 +36,35 @@ impl Compiler {
 
             let mut tokenizer: Tokenizer = Tokenizer::new(file, &source);
             let tokens: Vec<Token> = tokenizer.tokenize();
-            for token in tokens {
+            let mut syntax_errors: Vec<HarmonyError> = vec![];
+            for token in &tokens {
                 if token.kind == TokenKind::Unknown {
-                    println!("Unknown token: {}", token.lexeme);
-                    break;
+                    syntax_errors.push(HarmonyError::new(
+                        HarmonyErrorKind::Syntax,
+                        format!("Unknown token: {}", token.lexeme),
+                        None,
+                        token.location.clone(),
+                    ));
                 }
-                println!("{:?}", token);
+            }
+            if syntax_errors.len() > 0 {
+                for error in syntax_errors {
+                    println!("{}", error.to_string());
+                }
+                continue;
+            }
+
+            let mut parser: Parser = Parser::new(tokens);
+            let statements: Result<Vec<Statement>, HarmonyError> = parser.parse();
+            match statements {
+                Ok(statements) => {
+                    for statement in statements {
+                        println!("{:?}", statement);
+                    }
+                }
+                Err(error) => {
+                    println!("{}", error.to_string());
+                }
             }
         }
     }

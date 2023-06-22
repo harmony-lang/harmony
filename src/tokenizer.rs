@@ -27,8 +27,15 @@ impl Tokenizer {
             match c {
                 ' ' | '\r' | '\t' => self.column += 1,
                 '\n' => {
-                    self.line += 1;
-                    self.column = 1;
+                    // self.add_token(TokenKind::Newline, c.to_string());
+                    // let mut spaces: usize = 0;
+                    // while self.peek() == Some(' ') {
+                    //     self.next();
+                    //     spaces += 1;
+                    //     if spaces % 4 == 0 {
+                    //         self.add_token(TokenKind::Whitespace, "    ".to_string());
+                    //     }
+                    // }
                 }
                 '(' => self.add_token(TokenKind::OpenParenthesis, c.to_string()),
                 ')' => self.add_token(TokenKind::CloseParenthesis, c.to_string()),
@@ -177,17 +184,18 @@ impl Tokenizer {
                             "fun" => self.add_token(TokenKind::Fun, identifier),
                             "case" => self.add_token(TokenKind::Case, identifier),
                             "of" => self.add_token(TokenKind::Of, identifier),
+                            "end" => self.add_token(TokenKind::End, identifier),
                             "if" => self.add_token(TokenKind::If, identifier),
                             "then" => self.add_token(TokenKind::Then, identifier),
                             "else" => self.add_token(TokenKind::Else, identifier),
                             "int" => self.add_token(TokenKind::Int, identifier),
                             "float" => self.add_token(TokenKind::Float, identifier),
-                            "String" => self.add_token(TokenKind::String, identifier),
+                            "string" => self.add_token(TokenKind::String, identifier),
                             "char" => self.add_token(TokenKind::Char, identifier),
                             "bool" => self.add_token(TokenKind::Bool, identifier),
                             "true" => self.add_token(TokenKind::BooleanLiteral, identifier),
                             "false" => self.add_token(TokenKind::BooleanLiteral, identifier),
-                            _ => self.add_token(TokenKind::IdentifierLiteral, identifier),
+                            _ => self.add_token(TokenKind::Identifier, identifier),
                         }
                     } else {
                         self.add_token(TokenKind::Unknown, c.to_string());
@@ -201,6 +209,12 @@ impl Tokenizer {
     fn next(&mut self) -> Option<char> {
         let c = self.source.chars().nth(self.index);
         self.index += 1;
+        if c == Some('\n') {
+            self.line += 1;
+            self.column = 1;
+        } else {
+            self.column += 1;
+        }
         c
     }
 
