@@ -1,0 +1,5 @@
+module Data.Result
+
+enum Result<T, E>
+    = Success(T)
+    | Failure(E)

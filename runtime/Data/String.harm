@@ -1,0 +1,9 @@
+module Data.String
+
+import Data.Maybe as Maybe
+
+fun get(s: String, i: int) -> Maybe<char> =
+    if i < 0 || i >= length(s) then Nothing
+    else Just (s[i])
+
+fun length(s: String) -> int = s.length

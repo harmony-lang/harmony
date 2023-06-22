@@ -1,0 +1,7 @@
+module Data.Char
+
+fun isDigit(c: char) -> bool =
+    c >= '0' && c <= '9'
+
+fun toInt(c: char) -> int =
+    c - '0'

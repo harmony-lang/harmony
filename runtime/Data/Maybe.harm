@@ -1,0 +1,5 @@
+module Data.Maybe
+
+enum Maybe<T>
+    = Just(T)
+    | Nothing
