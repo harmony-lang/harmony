@@ -1,6 +1,6 @@
 module Tokenizer
 
-import Console.IO as IO
+import Console.IO as Console
 import Data.Char as Char
 import Data.Maybe as Maybe
 import Data.Result as Result
@@ -79,8 +79,8 @@ fun parse(tokens: [Token]) -> Result<Expression, string> =
 fun main =
     case tokenize("1 + 2 * 3") of
         | Success(tokens) => case parse(tokens) of
-            | Success(expr) => IO.println(expr)
-            | Failure(error) => IO.println(error)
+            | Success(expr) => Console.println(expr)
+            | Failure(error) => Console.println(error)
         end
-        | Failure(error) => IO.println(error)
+        | Failure(error) => Console.println(error)
     end
