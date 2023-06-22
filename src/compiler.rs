@@ -1,3 +1,8 @@
+use crate::{
+    token::{Token, TokenKind},
+    tokenizer::Tokenizer,
+};
+
 #[derive(Debug, Clone)]
 pub struct Compiler {
     pub options: CompilerOptions,
@@ -17,9 +22,24 @@ impl Compiler {
             println!("Compiling {}", file);
 
             let source: String = std::fs::read_to_string(file).unwrap();
-            println!("{}", source);
+            // println!("{}", source);
 
-            println!(" -> {}", file);
+            // Semantic analysis steps:
+            //   1. Scan for imports
+            //   2. Locate all identifiers and their types (ex. functions, variables, etc.)
+            //   3. Check for type errors
+            //   4. Remove unused code
+            //   5. Generate JavaScript code
+
+            let mut tokenizer: Tokenizer = Tokenizer::new(file, &source);
+            let tokens: Vec<Token> = tokenizer.tokenize();
+            for token in tokens {
+                if token.kind == TokenKind::Unknown {
+                    println!("Unknown token: {}", token.lexeme);
+                    break;
+                }
+                println!("{:?}", token);
+            }
         }
     }
 }

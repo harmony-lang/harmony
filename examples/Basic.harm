@@ -37,5 +37,5 @@ fun tokenize(input: String) -> Result<[Token], String> =
 
 fun main =
     case tokenize("1 + 2 * 3") of
-        | Success(tokens) => IO.log $ tokens
-        | Failure(error) => IO.log $ error
+        | Success(tokens) => IO.log tokens
+        | Failure(error) => IO.log error
