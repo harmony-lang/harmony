@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SourceLocation {
     pub file: String,
     pub line: usize,
@@ -20,6 +20,15 @@ impl SourceLocation {
             self.line.to_string(),
             self.column.to_string()
         )
+    }
+
+    pub fn default() -> SourceLocation {
+        SourceLocation {
+            file: String::new(),
+            line: 0,
+            column: 0,
+            length: 0,
+        }
     }
 }
 

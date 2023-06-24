@@ -157,6 +157,16 @@ impl Parser {
         self.expect(TokenKind::Enum)?;
         let location: SourceLocation = self.current()?.location;
         let name = self.expect(TokenKind::Identifier)?.lexeme;
+        let mut generic_parameters: Vec<Type> = vec![];
+        if !self.is_at_end() && self.current()?.kind == TokenKind::LessThan {
+            self.expect(TokenKind::LessThan)?;
+            generic_parameters.push(self.parse_type()?);
+            while !self.is_at_end() && self.current()?.kind == TokenKind::Comma {
+                self.expect(TokenKind::Comma)?;
+                generic_parameters.push(self.parse_type()?);
+            }
+            self.expect(TokenKind::GreaterThan)?;
+        }
         let mut variants: Vec<EnumVariant> = vec![];
         self.expect(TokenKind::Equals)?;
         variants.push(self.parse_enum_variant()?);
@@ -164,10 +174,18 @@ impl Parser {
             self.expect(TokenKind::Pipe)?;
             variants.push(self.parse_enum_variant()?);
         }
-        Ok(Statement::Enum {
-            name: (name, location),
-            variants,
-        })
+        if generic_parameters.is_empty() {
+            Ok(Statement::Enum {
+                name: (name, location),
+                variants,
+            })
+        } else {
+            Ok(Statement::GenericEnum {
+                name: (name, location),
+                generic_parameters,
+                variants,
+            })
+        }
     }
 
     fn parse_enum_variant(&mut self) -> Result<EnumVariant, HarmonyError> {
@@ -220,8 +238,22 @@ impl Parser {
                 right: Box::new(right),
             })
         } else {
-            self.parse_primary_expression()
+            self.parse_index_expression()
         }
+    }
+
+    fn parse_index_expression(&mut self) -> Result<Expression, HarmonyError> {
+        let mut expression: Expression = self.parse_primary_expression()?;
+        while !self.is_at_end() && self.current()?.kind == TokenKind::OpenBracket {
+            self.expect(TokenKind::OpenBracket)?;
+            let index = self.parse_expression()?;
+            self.expect(TokenKind::CloseBracket)?;
+            expression = Expression::Index {
+                expression: Box::new(expression),
+                index: Box::new(index),
+            };
+        }
+        Ok(expression)
     }
 
     fn parse_primary_expression(&mut self) -> Result<Expression, HarmonyError> {
@@ -324,15 +356,12 @@ impl Parser {
                 let condition: Expression = self.parse_expression()?;
                 self.expect(TokenKind::Then)?;
                 let then_branch: Expression = self.parse_expression()?;
-                let mut else_branch: Option<Box<Expression>> = None;
-                if !self.is_at_end() && self.current()?.kind == TokenKind::Else {
-                    self.expect(TokenKind::Else)?;
-                    else_branch = Some(Box::new(self.parse_expression()?));
-                }
+                self.expect(TokenKind::Else)?;
+                let else_branch: Expression = self.parse_expression()?;
                 Ok(Expression::If {
                     condition: Box::new(condition),
                     then_branch: Box::new(then_branch),
-                    else_branch,
+                    else_branch: Box::new(else_branch),
                 })
             }
             TokenKind::DoubleDot => {
@@ -397,7 +426,7 @@ impl Parser {
                 self.expect(TokenKind::OpenBracket)?;
                 let inner_type: Type = self.parse_type()?;
                 self.expect(TokenKind::CloseBracket)?;
-                Ok(Type::List(Box::new(inner_type)))
+                Ok(Type::List(Some(Box::new(inner_type))))
             }
             _ => Err(HarmonyError::new(
                 HarmonyErrorKind::Syntax,

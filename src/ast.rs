@@ -3,11 +3,11 @@ use crate::token::{SourceLocation, TokenKind};
 #[derive(Debug, Clone)]
 pub enum Statement {
     Module {
-        name: Vec<(String, SourceLocation)>, // formatted as Foo.Bar.Baz
+        name: Vec<(String, SourceLocation)>,
         exposing: Vec<(String, SourceLocation)>,
     },
     Import {
-        name: Vec<(String, SourceLocation)>, // formatted as Foo.Bar.Baz
+        name: Vec<(String, SourceLocation)>,
         alias: Option<(String, SourceLocation)>,
         exposing: Vec<(String, SourceLocation)>,
     },
@@ -19,6 +19,11 @@ pub enum Statement {
     },
     Enum {
         name: (String, SourceLocation),
+        variants: Vec<EnumVariant>,
+    },
+    GenericEnum {
+        name: (String, SourceLocation),
+        generic_parameters: Vec<Type>,
         variants: Vec<EnumVariant>,
     },
 }
@@ -53,17 +58,49 @@ pub enum Expression {
     If {
         condition: Box<Expression>,
         then_branch: Box<Expression>,
-        else_branch: Option<Box<Expression>>,
+        else_branch: Box<Expression>,
     },
     Access {
         name: (String, SourceLocation),
         member: Box<Expression>,
     },
     Rest(Box<Expression>),
+    Index {
+        expression: Box<Expression>,
+        index: Box<Expression>,
+    },
+}
+
+impl Expression {
+    pub fn location(&self) -> SourceLocation {
+        match self {
+            Expression::Binary { left, right, .. } => left.location().merge(&right.location()),
+            Expression::Unary { right, .. } => right.location(),
+            Expression::Call { callee, .. } => callee.1.clone(),
+            Expression::Identifier(_, location) => location.clone(),
+            Expression::Integer(_, location) => location.clone(),
+            Expression::Float(_, location) => location.clone(),
+            Expression::String(_, location) => location.clone(),
+            Expression::Bool(_, location) => location.clone(),
+            Expression::Char(_, location) => location.clone(),
+            Expression::PatternMatch { expression, .. } => expression.location(),
+            Expression::List(expressions) => expressions
+                .first()
+                .map(|expression| expression.location())
+                .unwrap_or(SourceLocation::default()),
+            Expression::If { condition, .. } => condition.location(),
+            Expression::Access { name, member } => name.1.merge(&member.location()),
+            Expression::Rest(expression) => expression.location(),
+            Expression::Index { expression, index } => {
+                expression.location().merge(&index.location())
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum Type {
+    Unit(SourceLocation),
     Int(SourceLocation),
     Float(SourceLocation),
     String(SourceLocation),
@@ -72,11 +109,52 @@ pub enum Type {
 
     Generic(String, SourceLocation, Vec<Type>),
 
-    List(Box<Type>),
+    List(Option<Box<Type>>),
 
     Function(Vec<Type>, Box<Type>),
 
+    Any(SourceLocation),
+
+    Enum(String, SourceLocation),
     Identifier(String, SourceLocation),
+}
+
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Type::Unit(_), Type::Unit(_)) => true,
+            (Type::Int(_), Type::Int(_)) => true,
+            (Type::Float(_), Type::Float(_)) => true,
+            (Type::String(_), Type::String(_)) => true,
+            (Type::Bool(_), Type::Bool(_)) => true,
+            (Type::Char(_), Type::Char(_)) => true,
+            (Type::Generic(name1, _, _), Type::Generic(name2, _, _)) => name1 == name2,
+            (Type::Generic(name1, _, _), Type::Enum(name2, _)) => name1 == name2,
+            (Type::Enum(name1, _), Type::Generic(name2, _, _)) => name1 == name2,
+            (Type::List(type1), Type::List(type2)) => {
+                if let (Some(type1), Some(type2)) = (type1.as_ref(), type2.as_ref()) {
+                    type1 == type2
+                } else {
+                    true
+                }
+            }
+            (
+                Type::Function(parameters1, return_type1),
+                Type::Function(parameters2, return_type2),
+            ) => parameters1 == parameters2 && return_type1 == return_type2,
+            (Type::Identifier(name1, _), Type::Identifier(name2, _)) => name1 == name2,
+            (Type::Identifier(name1, _), Type::Enum(name2, _)) => name1 == name2,
+            (Type::Enum(name1, _), Type::Identifier(name2, _)) => name1 == name2,
+            (Type::Enum(name1, _), Type::Enum(name2, _)) => name1 == name2,
+            (Type::Any(_), _) => true,
+            (_, Type::Any(_)) => true,
+            _ => false,
+        }
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
 }
 
 #[derive(Debug, Clone)]

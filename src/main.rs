@@ -39,7 +39,7 @@ fn main() {
     }
 
     let compiler_options: CompilerOptions = CompilerOptions::new(options);
-    let compiler: Compiler = Compiler::new(&compiler_options, &files);
+    let mut compiler: Compiler = Compiler::new(&compiler_options, &files);
 
     compiler.compile();
 }

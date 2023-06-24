@@ -54,7 +54,7 @@ fun parse(tokens: [Token]) -> Result<Expression, string> =
             | Success(expr) => case rest of
                 | [TkRParen, ..rest] => Success(expr)
                 | else => Failure("Expected ')'")
-                end
+            end
             | Failure(error) => Failure(error)
         end
         | [TkNumber(n), TkPlus, ..rest] => case parse(rest) of
