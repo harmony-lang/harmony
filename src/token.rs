@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SourceLocation {
     pub file: String,
@@ -9,7 +11,11 @@ pub struct SourceLocation {
 impl SourceLocation {
     pub fn merge(&self, other: &SourceLocation) -> SourceLocation {
         let mut location = self.clone();
-        location.length = other.column + other.length - self.column;
+        let length: i64 = (self.line + self.column + self.length) as i64
+            - (other.line + other.column + other.length) as i64;
+        if length > 0 {
+            location.length = length as usize;
+        }
         location
     }
 
@@ -107,6 +113,68 @@ pub enum TokenKind {
     Whitespace,
     EndOfFile,
     Unknown,
+}
+
+impl Display for TokenKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TokenKind::Identifier => write!(f, "<identifier>"),
+            TokenKind::IntegerLiteral => write!(f, "<integer literal>"),
+            TokenKind::FloatLiteral => write!(f, "<float literal>"),
+            TokenKind::StringLiteral => write!(f, "<string literal>"),
+            TokenKind::CharacterLiteral => write!(f, "<character literal>"),
+            TokenKind::BooleanLiteral => write!(f, "<boolean literal>"),
+            TokenKind::Module => write!(f, "module"),
+            TokenKind::Import => write!(f, "import"),
+            TokenKind::As => write!(f, "as"),
+            TokenKind::Exposing => write!(f, "exposing"),
+            TokenKind::Enum => write!(f, "enum"),
+            TokenKind::Fun => write!(f, "fun"),
+            TokenKind::Case => write!(f, "case"),
+            TokenKind::Of => write!(f, "of"),
+            TokenKind::End => write!(f, "end"),
+            TokenKind::If => write!(f, "if"),
+            TokenKind::Then => write!(f, "then"),
+            TokenKind::Else => write!(f, "else"),
+            TokenKind::Int => write!(f, "int"),
+            TokenKind::Float => write!(f, "float"),
+            TokenKind::String => write!(f, "string"),
+            TokenKind::Char => write!(f, "char"),
+            TokenKind::Bool => write!(f, "bool"),
+            TokenKind::OpenParenthesis => write!(f, "("),
+            TokenKind::CloseParenthesis => write!(f, ")"),
+            TokenKind::OpenBracket => write!(f, "["),
+            TokenKind::CloseBracket => write!(f, "]"),
+            TokenKind::Dot => write!(f, "."),
+            TokenKind::DoubleDot => write!(f, ".."),
+            TokenKind::Comma => write!(f, ","),
+            TokenKind::Colon => write!(f, ":"),
+            TokenKind::DoubleColon => write!(f, "::"),
+            TokenKind::Pipe => write!(f, "|"),
+            TokenKind::Arrow => write!(f, "->"),
+            TokenKind::FatArrow => write!(f, "=>"),
+            TokenKind::Plus => write!(f, "+"),
+            TokenKind::PlusPlus => write!(f, "++"),
+            TokenKind::Minus => write!(f, "-"),
+            TokenKind::Asterisk => write!(f, "*"),
+            TokenKind::Slash => write!(f, "/"),
+            TokenKind::Percent => write!(f, "%"),
+            TokenKind::Equals => write!(f, "="),
+            TokenKind::DoubleEquals => write!(f, "=="),
+            TokenKind::NotEquals => write!(f, "/="),
+            TokenKind::LessThan => write!(f, "<"),
+            TokenKind::LessThanEquals => write!(f, "<="),
+            TokenKind::GreaterThan => write!(f, ">"),
+            TokenKind::GreaterThanEquals => write!(f, ">="),
+            TokenKind::And => write!(f, "&&"),
+            TokenKind::Or => write!(f, "||"),
+            TokenKind::Not => write!(f, "!"),
+            TokenKind::Newline => write!(f, "<newline>"),
+            TokenKind::Whitespace => write!(f, "<whitespace>"),
+            TokenKind::EndOfFile => write!(f, "<end of file>"),
+            TokenKind::Unknown => write!(f, "<unknown>"),
+        }
+    }
 }
 
 impl TokenKind {
