@@ -169,10 +169,10 @@ impl Parser {
         }
         let mut variants: Vec<EnumVariant> = vec![];
         self.expect(TokenKind::Equals)?;
-        variants.push(self.parse_enum_variant()?);
+        variants.push(self.parse_enum_variant(!generic_parameters.is_empty())?);
         while !self.is_at_end() && self.current()?.kind == TokenKind::Pipe {
             self.expect(TokenKind::Pipe)?;
-            variants.push(self.parse_enum_variant()?);
+            variants.push(self.parse_enum_variant(!generic_parameters.is_empty())?);
         }
         if generic_parameters.is_empty() {
             Ok(Statement::Enum {
@@ -188,16 +188,34 @@ impl Parser {
         }
     }
 
-    fn parse_enum_variant(&mut self) -> Result<EnumVariant, HarmonyError> {
+    fn parse_enum_variant(&mut self, is_generic: bool) -> Result<EnumVariant, HarmonyError> {
         let location: SourceLocation = self.current()?.location;
         let name = self.expect(TokenKind::Identifier)?.lexeme;
         if !self.is_at_end() && self.current()?.kind == TokenKind::OpenParenthesis {
             self.expect(TokenKind::OpenParenthesis)?;
             let mut types: Vec<Type> = vec![];
-            types.push(self.parse_type()?);
+            types.push(match self.parse_type()? {
+                Type::Identifier(name, location) => {
+                    if is_generic {
+                        Type::GenericParameter(name, location)
+                    } else {
+                        Type::Identifier(name, location)
+                    }
+                }
+                type_ => type_,
+            });
             while !self.is_at_end() && self.current()?.kind == TokenKind::Comma {
                 self.expect(TokenKind::Comma)?;
-                types.push(self.parse_type()?);
+                types.push(match self.parse_type()? {
+                    Type::Identifier(name, location) => {
+                        if is_generic {
+                            Type::GenericParameter(name, location)
+                        } else {
+                            Type::Identifier(name, location)
+                        }
+                    }
+                    type_ => type_,
+                });
             }
             self.expect(TokenKind::CloseParenthesis)?;
             return Ok(EnumVariant::Tuple(name, location, types));

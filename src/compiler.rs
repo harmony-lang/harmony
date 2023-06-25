@@ -79,7 +79,7 @@ impl Compiler {
         match imports {
             Ok(imports) => {
                 for import in imports.clone() {
-                    checker.scope.imports.push(import.clone());
+                    checker.global_scope.imports.push(import.clone());
                     let full_path: Result<String, HarmonyError> =
                         checker.get_path_of_import(&import.clone());
                     if let Err(error) = full_path {
@@ -95,7 +95,7 @@ impl Compiler {
                 }
                 checker = Checker::new(&self, &statements.clone().unwrap(), file);
                 for import in imports {
-                    checker.scope.imports.push(import);
+                    checker.global_scope.imports.push(import);
                 }
             }
             Err(error) => {
@@ -106,7 +106,7 @@ impl Compiler {
 
         let check_result: Result<(), HarmonyError> = checker.analyze();
         self.compiled_files
-            .insert(file.clone(), checker.scope.clone());
+            .insert(file.clone(), checker.global_scope.clone());
 
         match check_result {
             Ok(_) => {}

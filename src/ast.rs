@@ -108,6 +108,7 @@ pub enum Type {
     Char(SourceLocation),
 
     Generic(String, SourceLocation, Vec<Type>),
+    GenericParameter(String, SourceLocation),
 
     List(Option<Box<Type>>),
 
@@ -131,6 +132,8 @@ impl PartialEq for Type {
             (Type::Generic(name1, _, _), Type::Generic(name2, _, _)) => name1 == name2,
             (Type::Generic(name1, _, _), Type::Enum(name2, _)) => name1 == name2,
             (Type::Enum(name1, _), Type::Generic(name2, _, _)) => name1 == name2,
+            (Type::GenericParameter(_, _), _) => true,
+            (_, Type::GenericParameter(_, _)) => true,
             (Type::List(type1), Type::List(type2)) => {
                 if let (Some(type1), Some(type2)) = (type1.as_ref(), type2.as_ref()) {
                     type1 == type2
