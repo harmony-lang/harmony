@@ -25,7 +25,9 @@ impl Tokenizer {
         while !self.is_at_end() {
             let c: char = self.next().unwrap();
             match c {
-                ' ' | '\r' | '\t' => self.column += 1,
+                ' ' | '\r' | '\t' => {
+                    // self.column += 1;
+                }
                 '\n' => {
                     // self.add_token(TokenKind::Newline, c.to_string());
                     // let mut spaces: usize = 0;
