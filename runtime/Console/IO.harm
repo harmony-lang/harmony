@@ -1,1 +1,4 @@
 module Console.IO
+
+extern fun println(s: any) -> unit = "console.log"
+

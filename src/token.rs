@@ -60,6 +60,7 @@ pub enum TokenKind {
     Import,
     As,
     Exposing,
+    Extern,
     Enum,
     Fun,
     Case,
@@ -75,6 +76,8 @@ pub enum TokenKind {
     String,
     Char,
     Bool,
+    Any,
+    Unit,
 
     // Punctuation
     OpenParenthesis,  // (
@@ -128,6 +131,7 @@ impl Display for TokenKind {
             TokenKind::Import => write!(f, "import"),
             TokenKind::As => write!(f, "as"),
             TokenKind::Exposing => write!(f, "exposing"),
+            TokenKind::Extern => write!(f, "extern"),
             TokenKind::Enum => write!(f, "enum"),
             TokenKind::Fun => write!(f, "fun"),
             TokenKind::Case => write!(f, "case"),
@@ -141,6 +145,8 @@ impl Display for TokenKind {
             TokenKind::String => write!(f, "string"),
             TokenKind::Char => write!(f, "char"),
             TokenKind::Bool => write!(f, "bool"),
+            TokenKind::Any => write!(f, "any"),
+            TokenKind::Unit => write!(f, "unit"),
             TokenKind::OpenParenthesis => write!(f, "("),
             TokenKind::CloseParenthesis => write!(f, ")"),
             TokenKind::OpenBracket => write!(f, "["),

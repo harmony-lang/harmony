@@ -78,6 +78,7 @@ impl Compiler {
         let imports: Result<Vec<Import>, HarmonyError> = checker.lookup_imports();
         match imports {
             Ok(imports) => {
+                let mut scopes: Vec<Scope> = vec![];
                 for import in imports.clone() {
                     checker.global_scope.imports.push(import.clone());
                     let full_path: Result<String, HarmonyError> =
@@ -92,10 +93,15 @@ impl Compiler {
                             continue;
                         }
                     }
+                    let scope: Scope = self.compiled_files.get(&full_path).unwrap().clone();
+                    scopes.push(scope);
                 }
                 checker = Checker::new(&self, &statements.clone().unwrap(), file);
                 for import in imports {
                     checker.global_scope.imports.push(import);
+                }
+                for scope in scopes {
+                    checker.global_scope.merge(&scope);
                 }
             }
             Err(error) => {

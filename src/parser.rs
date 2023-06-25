@@ -31,6 +31,7 @@ impl Parser {
             TokenKind::Import => self.parse_import(),
             TokenKind::Fun => self.parse_function(),
             TokenKind::Enum => self.parse_enum(),
+            TokenKind::Extern => self.parse_extern(),
             _ => Err(HarmonyError::new(
                 HarmonyErrorKind::Syntax,
                 format!("Expected statement, found {:?}", self.current()?.kind),
@@ -160,10 +161,18 @@ impl Parser {
         let mut generic_parameters: Vec<Type> = vec![];
         if !self.is_at_end() && self.current()?.kind == TokenKind::LessThan {
             self.expect(TokenKind::LessThan)?;
-            generic_parameters.push(self.parse_type()?);
+            let location: SourceLocation = self.current()?.location;
+            generic_parameters.push(Type::GenericParameter(
+                self.expect(TokenKind::Identifier)?.lexeme,
+                location,
+            ));
             while !self.is_at_end() && self.current()?.kind == TokenKind::Comma {
                 self.expect(TokenKind::Comma)?;
-                generic_parameters.push(self.parse_type()?);
+                let location: SourceLocation = self.current()?.location;
+                generic_parameters.push(Type::GenericParameter(
+                    self.expect(TokenKind::Identifier)?.lexeme,
+                    location,
+                ));
             }
             self.expect(TokenKind::GreaterThan)?;
         }
@@ -221,6 +230,51 @@ impl Parser {
             return Ok(EnumVariant::Tuple(name, location, types));
         }
         Ok(EnumVariant::Unit(name, location))
+    }
+
+    fn parse_extern(&mut self) -> Result<Statement, HarmonyError> {
+        self.expect(TokenKind::Extern)?;
+        self.expect(TokenKind::Fun)?;
+        let location: SourceLocation = self.current()?.location;
+        let name = self.expect(TokenKind::Identifier)?.lexeme;
+        let mut parameters: Vec<Parameter> = vec![];
+        let mut return_type: Option<Type> = None;
+        if !self.is_at_end() && self.current()?.kind == TokenKind::OpenParenthesis {
+            self.expect(TokenKind::OpenParenthesis)?;
+            if !self.is_at_end() && self.current()?.kind == TokenKind::Identifier {
+                let location: SourceLocation = self.current()?.location;
+                let identifier = self.expect(TokenKind::Identifier)?.lexeme;
+                self.expect(TokenKind::Colon)?;
+                let type_ = self.parse_type()?;
+                parameters.push(Parameter {
+                    name: (identifier, location),
+                    type_,
+                });
+                while !self.is_at_end() && self.current()?.kind == TokenKind::Comma {
+                    self.expect(TokenKind::Comma)?;
+                    let location: SourceLocation = self.current()?.location;
+                    let identifier = self.expect(TokenKind::Identifier)?.lexeme;
+                    self.expect(TokenKind::Colon)?;
+                    let type_ = self.parse_type()?;
+                    parameters.push(Parameter {
+                        name: (identifier, location),
+                        type_,
+                    });
+                }
+            }
+            self.expect(TokenKind::CloseParenthesis)?;
+            self.expect(TokenKind::Arrow)?;
+            return_type = Some(self.parse_type()?);
+        }
+        self.expect(TokenKind::Equals)?;
+        let binding_location: SourceLocation = self.current()?.location;
+        let binding: String = self.expect(TokenKind::StringLiteral)?.lexeme;
+        Ok(Statement::ExternFunction {
+            name: (name, location),
+            parameters,
+            return_type,
+            binding: (binding, binding_location),
+        })
     }
 
     fn parse_expression(&mut self) -> Result<Expression, HarmonyError> {
@@ -404,10 +458,20 @@ impl Parser {
                 if !self.is_at_end() && self.current()?.kind == TokenKind::LessThan {
                     self.expect(TokenKind::LessThan)?;
                     let mut types: Vec<Type> = vec![];
-                    types.push(self.parse_type()?);
+                    types.push(match self.parse_type()? {
+                        Type::Identifier(identifier, location) => {
+                            Type::GenericArgument(identifier, location)
+                        }
+                        ty => ty,
+                    });
                     while !self.is_at_end() && self.current()?.kind == TokenKind::Comma {
                         self.expect(TokenKind::Comma)?;
-                        types.push(self.parse_type()?);
+                        types.push(match self.parse_type()? {
+                            Type::Identifier(identifier, location) => {
+                                Type::GenericArgument(identifier, location)
+                            }
+                            ty => ty,
+                        });
                     }
                     self.expect(TokenKind::GreaterThan)?;
                     Ok(Type::Generic(identifier, location, types))
@@ -439,6 +503,16 @@ impl Parser {
                 let location: SourceLocation = self.current()?.location;
                 self.expect(TokenKind::Char)?;
                 Ok(Type::Char(location))
+            }
+            TokenKind::Any => {
+                let location: SourceLocation = self.current()?.location;
+                self.expect(TokenKind::Any)?;
+                Ok(Type::Any(location))
+            }
+            TokenKind::Unit => {
+                let location: SourceLocation = self.current()?.location;
+                self.expect(TokenKind::Unit)?;
+                Ok(Type::Unit(location))
             }
             TokenKind::OpenBracket => {
                 self.expect(TokenKind::OpenBracket)?;

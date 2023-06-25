@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::token::{SourceLocation, TokenKind};
 
 #[derive(Debug, Clone)]
@@ -10,6 +12,12 @@ pub enum Statement {
         name: Vec<(String, SourceLocation)>,
         alias: Option<(String, SourceLocation)>,
         exposing: Vec<(String, SourceLocation)>,
+    },
+    ExternFunction {
+        name: (String, SourceLocation),
+        parameters: Vec<Parameter>,
+        return_type: Option<Type>,
+        binding: (String, SourceLocation),
     },
     Function {
         name: (String, SourceLocation),
@@ -109,6 +117,7 @@ pub enum Type {
 
     Generic(String, SourceLocation, Vec<Type>),
     GenericParameter(String, SourceLocation),
+    GenericArgument(String, SourceLocation),
 
     List(Option<Box<Type>>),
 
@@ -117,7 +126,64 @@ pub enum Type {
     Any(SourceLocation),
 
     Enum(String, SourceLocation),
+    GenericEnum(String, SourceLocation, Vec<Type>),
     Identifier(String, SourceLocation),
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::Unit(_) => write!(f, "()"),
+            Type::Int(_) => write!(f, "int"),
+            Type::Float(_) => write!(f, "float"),
+            Type::String(_) => write!(f, "string"),
+            Type::Bool(_) => write!(f, "bool"),
+            Type::Char(_) => write!(f, "char"),
+            Type::Generic(name, _, types) => {
+                let mut types_string = String::new();
+                for type_ in types {
+                    types_string.push_str(&format!("{}, ", type_));
+                }
+                if types.len() > 0 {
+                    types_string.pop();
+                    types_string.pop();
+                }
+                write!(f, "{}<{}>", name, types_string)
+            }
+            Type::GenericParameter(name, _) => write!(f, "{}", name),
+            Type::GenericArgument(name, _) => write!(f, "{}", name),
+            Type::List(type_) => {
+                if let Some(type_) = type_.as_ref() {
+                    write!(f, "[{}]", type_)
+                } else {
+                    write!(f, "[]")
+                }
+            }
+            Type::Function(parameters, return_type) => {
+                let mut parameters_string = String::new();
+                for parameter in parameters {
+                    parameters_string.push_str(&format!("{}, ", parameter));
+                }
+                parameters_string.pop();
+                parameters_string.pop();
+                write!(f, "({} -> {})", parameters_string, return_type)
+            }
+            Type::Any(_) => write!(f, "Any"),
+            Type::Enum(name, _) => write!(f, "{}", name),
+            Type::GenericEnum(name, _, types) => {
+                let mut types_string = String::new();
+                for type_ in types {
+                    types_string.push_str(&format!("{}, ", type_));
+                }
+                if types.len() > 0 {
+                    types_string.pop();
+                    types_string.pop();
+                }
+                write!(f, "{}<{}>", name, types_string)
+            }
+            Type::Identifier(name, _) => write!(f, "{}", name),
+        }
+    }
 }
 
 impl PartialEq for Type {
@@ -129,11 +195,15 @@ impl PartialEq for Type {
             (Type::String(_), Type::String(_)) => true,
             (Type::Bool(_), Type::Bool(_)) => true,
             (Type::Char(_), Type::Char(_)) => true,
+            (Type::Char(_), Type::Int(_)) => true, // might remove
+            (Type::Int(_), Type::Char(_)) => true, // might remove
             (Type::Generic(name1, _, _), Type::Generic(name2, _, _)) => name1 == name2,
             (Type::Generic(name1, _, _), Type::Enum(name2, _)) => name1 == name2,
             (Type::Enum(name1, _), Type::Generic(name2, _, _)) => name1 == name2,
             (Type::GenericParameter(_, _), _) => true,
             (_, Type::GenericParameter(_, _)) => true,
+            (Type::GenericArgument(_, _), _) => true,
+            (_, Type::GenericArgument(_, _)) => true,
             (Type::List(type1), Type::List(type2)) => {
                 if let (Some(type1), Some(type2)) = (type1.as_ref(), type2.as_ref()) {
                     type1 == type2
@@ -149,6 +219,13 @@ impl PartialEq for Type {
             (Type::Identifier(name1, _), Type::Enum(name2, _)) => name1 == name2,
             (Type::Enum(name1, _), Type::Identifier(name2, _)) => name1 == name2,
             (Type::Enum(name1, _), Type::Enum(name2, _)) => name1 == name2,
+            (Type::GenericEnum(name1, _, _), Type::GenericEnum(name2, _, _)) => name1 == name2,
+            (Type::GenericEnum(name1, _, _), Type::Enum(name2, _)) => name1 == name2,
+            (Type::Enum(name1, _), Type::GenericEnum(name2, _, _)) => name1 == name2,
+            (Type::GenericEnum(name1, _, _), Type::Identifier(name2, _)) => name1 == name2,
+            (Type::GenericEnum(name1, _, _), Type::Generic(name2, _, _)) => name1 == name2,
+            (Type::Generic(name1, _, _), Type::GenericEnum(name2, _, _)) => name1 == name2,
+            (Type::Identifier(name1, _), Type::GenericEnum(name2, _, _)) => name1 == name2,
             (Type::Any(_), _) => true,
             (_, Type::Any(_)) => true,
             _ => false,

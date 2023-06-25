@@ -4,7 +4,7 @@ use crate::{
     ast::{EnumVariant, Expression, Parameter, Statement, Type},
     compiler::Compiler,
     error::{HarmonyError, HarmonyErrorKind},
-    token::SourceLocation,
+    token::{SourceLocation, TokenKind},
 };
 
 type EnumId = usize;
@@ -16,6 +16,7 @@ pub struct Scope {
     pub module: Option<(String, SourceLocation)>,
     pub imports: Vec<Import>,
     pub enum_names: HashMap<String, EnumId>,
+    pub enum_variants: HashMap<String, EnumId>,
     pub enums: HashMap<EnumId, Enum>,
     pub function_names: HashMap<String, FunctionId>,
     pub functions: HashMap<FunctionId, Function>,
@@ -33,6 +34,7 @@ impl Scope {
             module: None,
             imports: Vec::new(),
             enum_names: HashMap::new(),
+            enum_variants: HashMap::new(),
             enums: HashMap::new(),
             function_names: HashMap::new(),
             functions: HashMap::new(),
@@ -41,10 +43,33 @@ impl Scope {
 
     pub fn merge(&mut self, other: &Scope) {
         self.imports.extend(other.imports.clone());
-        self.enum_names.extend(other.enum_names.clone());
-        self.enums.extend(other.enums.clone());
-        self.function_names.extend(other.function_names.clone());
-        self.functions.extend(other.functions.clone());
+        for (name, id) in other.enum_names.clone() {
+            let old_id: usize = id;
+            if !self.enum_names.contains_key(&name) {
+                let id: usize = self.enums.len();
+                self.enum_names.insert(name, id);
+                self.enums
+                    .insert(id, other.enums.get(&old_id).unwrap().clone());
+                for variant in other.enums.get(&old_id).unwrap().variants.clone() {
+                    self.enum_variants.insert(
+                        match variant {
+                            EnumVariant::Unit(name, _) => name,
+                            EnumVariant::Tuple(name, _, _) => name,
+                        },
+                        id,
+                    );
+                }
+            }
+        }
+        for (name, id) in other.function_names.clone() {
+            let old_id: usize = id;
+            if !self.function_names.contains_key(&name) {
+                let id: usize = self.functions.len();
+                self.function_names.insert(name, id);
+                self.functions
+                    .insert(id, other.functions.get(&old_id).unwrap().clone());
+            }
+        }
     }
 }
 
@@ -232,6 +257,53 @@ impl Checker {
                 alias: _,
                 exposing: _,
             } => Ok(()),
+            Statement::ExternFunction {
+                name,
+                parameters,
+                return_type,
+                binding: _,
+            } => {
+                let function_id: FunctionId = self.global_scope.functions.len();
+                let (name, location) = name.clone();
+
+                let mut local_scope: LocalScope = LocalScope::new();
+                let mut parameter_types: Vec<Type> = Vec::new();
+                for parameter in parameters {
+                    let parameter_name: String = parameter.name.clone().0.clone();
+                    let parameter_type: Type = parameter.type_.clone();
+                    parameter_types.push(parameter_type.clone());
+                    local_scope.variables.insert(
+                        parameter_name.clone(),
+                        Variable {
+                            name: parameter_name.clone(),
+                            type_: parameter_type,
+                            location: parameter.name.clone().1,
+                            value: None,
+                        },
+                    );
+                }
+
+                let return_type: Type = match return_type.clone() {
+                    Some(type_) => type_,
+                    None => Type::Unit(location.clone()),
+                };
+
+                let function: Function = Function {
+                    name: name.clone(),
+                    parameters: parameters.clone(),
+                    return_type: return_type.clone(),
+                    body: None,
+                    location: location.clone(),
+                    local_scope: local_scope.clone(),
+                    is_external: true,
+                };
+                self.global_scope
+                    .function_names
+                    .insert(name.clone(), function_id);
+                self.global_scope.functions.insert(function_id, function);
+
+                Ok(())
+            }
             Statement::Function {
                 name,
                 parameters,
@@ -268,26 +340,603 @@ impl Checker {
                     name: name.clone(),
                     parameters: parameters.clone(),
                     return_type: return_type.clone(),
-                    body: body.clone(),
+                    body: Some(body.clone()),
                     location: location.clone(),
                     local_scope: local_scope.clone(),
+                    is_external: false,
                 };
                 self.global_scope
                     .function_names
                     .insert(name.clone(), function_id);
                 self.global_scope.functions.insert(function_id, function);
 
+                let body_type: Type = self.check_expression(&body, &mut local_scope)?;
+                if body_type != return_type {
+                    return Err(HarmonyError::new(
+                        HarmonyErrorKind::Semantic,
+                        format!(
+                            "Function '{}' return type '{}' does not match body type '{}'",
+                            name, return_type, body_type
+                        ),
+                        None,
+                        location.clone(),
+                    ));
+                }
+
                 Ok(())
             }
-            _ => {
-                dbg!(statement);
-                todo!("check_statement")
+            Statement::Enum { name, variants } => {
+                let enum_id: EnumId = self.global_scope.enums.len();
+                let (name, location) = name.clone();
+
+                let mut variant_names: Vec<String> = Vec::new();
+                for variant in variants {
+                    match variant {
+                        EnumVariant::Unit(name, _) => {
+                            variant_names.push(name.clone());
+                        }
+                        EnumVariant::Tuple(name, _, _) => {
+                            variant_names.push(name.clone());
+                        }
+                    }
+                }
+
+                let enum_: Enum = Enum {
+                    name: name.clone(),
+                    variants: variants.clone(),
+                    location: location.clone(),
+                    generic_parameters: vec![],
+                };
+                self.global_scope.enum_names.insert(name.clone(), enum_id);
+                self.global_scope.enums.insert(enum_id, enum_);
+                for name in variant_names {
+                    self.global_scope
+                        .enum_variants
+                        .insert(name.clone(), enum_id);
+                }
+
+                Ok(())
+            }
+            Statement::GenericEnum {
+                name,
+                generic_parameters,
+                variants,
+            } => {
+                let enum_id: EnumId = self.global_scope.enums.len();
+                let (name, location) = name.clone();
+
+                let mut variant_names: Vec<String> = Vec::new();
+                for variant in variants {
+                    match variant {
+                        EnumVariant::Unit(name, _) => {
+                            variant_names.push(name.clone());
+                        }
+                        EnumVariant::Tuple(name, _, _) => {
+                            variant_names.push(name.clone());
+                        }
+                    }
+                }
+
+                for variant in variants {
+                    match variant {
+                        EnumVariant::Tuple(_, _, types) => {
+                            for type_ in types {
+                                match type_ {
+                                    Type::GenericParameter(name, _) => {
+                                        if !generic_parameters.contains(type_) {
+                                            return Err(HarmonyError::new(
+                                                HarmonyErrorKind::Semantic,
+                                                format!("Generic parameter {} not found", name),
+                                                None,
+                                                location.clone(),
+                                            ));
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                let enum_: Enum = Enum {
+                    name: name.clone(),
+                    variants: variants.clone(),
+                    location: location.clone(),
+                    generic_parameters: generic_parameters.clone(),
+                };
+                self.global_scope.enum_names.insert(name.clone(), enum_id);
+                self.global_scope.enums.insert(enum_id, enum_);
+                for name in variant_names {
+                    self.global_scope
+                        .enum_variants
+                        .insert(name.clone(), enum_id);
+                }
+
+                Ok(())
             }
         }
     }
 
-    fn check_expression(&mut self, expression: &Expression) -> Result<Type, HarmonyError> {
+    fn check_expression(
+        &mut self,
+        expression: &Expression,
+        local_scope: &mut LocalScope,
+    ) -> Result<Type, HarmonyError> {
         match expression {
+            Expression::Binary {
+                left,
+                operator,
+                right,
+            } => {
+                let left_type: Type = self.check_expression(left, local_scope)?;
+                let right_type: Type = self.check_expression(right, local_scope)?;
+                match operator {
+                    TokenKind::Plus
+                    | TokenKind::Minus
+                    | TokenKind::Asterisk
+                    | TokenKind::Slash
+                    | TokenKind::Percent => {
+                        if let Type::Int(loc1) = left_type.clone() {
+                            if let Type::Int(loc2) = right_type {
+                                return Ok(Type::Int(loc1.merge(&loc2)));
+                            }
+                        }
+                        if let Type::Float(loc1) = left_type.clone() {
+                            if let Type::Float(loc2) = right_type {
+                                return Ok(Type::Float(loc1.merge(&loc2)));
+                            }
+                        }
+                        if let Type::Int(loc1) = left_type.clone() {
+                            if let Type::Float(loc2) = right_type {
+                                return Ok(Type::Float(loc1.merge(&loc2)));
+                            }
+                        }
+                        if let Type::Float(loc1) = left_type.clone() {
+                            if let Type::Int(loc2) = right_type {
+                                return Ok(Type::Float(loc1.merge(&loc2)));
+                            }
+                        }
+                        if let Type::Char(loc1) = left_type.clone() {
+                            if let Type::Char(loc2) = right_type {
+                                return Ok(Type::Char(loc1.merge(&loc2)));
+                            }
+                        }
+                        return Err(HarmonyError::new(
+                            HarmonyErrorKind::Semantic,
+                            format!(
+                                "Binary operator '{}' cannot be applied to types '{}' and '{}'",
+                                operator,
+                                left_type.clone(),
+                                right_type
+                            ),
+                            None,
+                            expression.location(),
+                        ));
+                    }
+                    TokenKind::DoubleEquals | TokenKind::NotEquals => {
+                        if left_type.clone() == right_type {
+                            return Ok(Type::Bool(expression.location().clone()));
+                        }
+                        return Err(HarmonyError::new(
+                            HarmonyErrorKind::Semantic,
+                            format!(
+                                "Binary operator '{}' cannot be applied to types '{}' and '{}'",
+                                operator,
+                                left_type.clone(),
+                                right_type
+                            ),
+                            None,
+                            expression.location(),
+                        ));
+                    }
+                    TokenKind::LessThan
+                    | TokenKind::LessThanEquals
+                    | TokenKind::GreaterThan
+                    | TokenKind::GreaterThanEquals => {
+                        if let Type::Int(loc1) = left_type.clone() {
+                            if let Type::Int(loc2) = right_type {
+                                return Ok(Type::Bool(loc1.merge(&loc2)));
+                            }
+                        }
+                        if let Type::Float(loc1) = left_type.clone() {
+                            if let Type::Float(loc2) = right_type {
+                                return Ok(Type::Bool(loc1.merge(&loc2)));
+                            }
+                        }
+                        if let Type::Int(loc1) = left_type.clone() {
+                            if let Type::Float(loc2) = right_type {
+                                return Ok(Type::Bool(loc1.merge(&loc2)));
+                            }
+                        }
+                        if let Type::Float(loc1) = left_type.clone() {
+                            if let Type::Int(loc2) = right_type {
+                                return Ok(Type::Bool(loc1.merge(&loc2)));
+                            }
+                        }
+                        if let Type::Char(loc1) = left_type.clone() {
+                            if let Type::Char(loc2) = right_type {
+                                return Ok(Type::Bool(loc1.merge(&loc2)));
+                            }
+                        }
+                        return Err(HarmonyError::new(
+                            HarmonyErrorKind::Semantic,
+                            format!(
+                                "Binary operator '{}' cannot be applied to types '{}' and '{}'",
+                                operator,
+                                left_type.clone(),
+                                right_type
+                            ),
+                            None,
+                            expression.location(),
+                        ));
+                    }
+                    TokenKind::And | TokenKind::Or => {
+                        if let Type::Bool(loc1) = left_type.clone() {
+                            if let Type::Bool(loc2) = right_type {
+                                return Ok(Type::Bool(loc1.merge(&loc2)));
+                            }
+                        }
+                        return Err(HarmonyError::new(
+                            HarmonyErrorKind::Semantic,
+                            format!(
+                                "Binary operator '{}' cannot be applied to types '{}' and '{}'",
+                                operator,
+                                left_type.clone(),
+                                right_type
+                            ),
+                            None,
+                            expression.location(),
+                        ));
+                    }
+                    TokenKind::PlusPlus => {
+                        if let Type::String(loc1) = left_type.clone() {
+                            if let Type::String(loc2) = right_type {
+                                return Ok(Type::String(loc1.merge(&loc2)));
+                            }
+                        }
+                        if let Type::List(_) = left_type.clone() {
+                            if let Type::List(_) = right_type {
+                                return Ok(left_type.clone());
+                            }
+                        }
+                        return Err(HarmonyError::new(
+                            HarmonyErrorKind::Semantic,
+                            format!(
+                                "Binary operator '{}' cannot be applied to types '{}' and '{}'",
+                                operator, left_type, right_type
+                            ),
+                            None,
+                            expression.location(),
+                        ));
+                    }
+                    _ => Err(HarmonyError::new(
+                        HarmonyErrorKind::Semantic,
+                        format!(
+                            "Binary operator '{}' cannot be applied to types '{}' and '{}'",
+                            operator, left_type, right_type
+                        ),
+                        None,
+                        expression.location(),
+                    )),
+                }
+            }
+            Expression::Identifier(identifier, location) => {
+                if let Some(variable) = local_scope.variables.get(identifier) {
+                    return Ok(variable.type_.clone());
+                }
+                println!("{} {:?}", identifier, self.global_scope.enum_variants);
+                if let Some(enum_id) = self.global_scope.enum_variants.get(identifier) {
+                    let enum_: Enum = self.global_scope.enums.get(&enum_id).unwrap().clone();
+                    let name: String = enum_.name.clone();
+                    if enum_.generic_parameters.len() > 0 {
+                        return Ok(Type::GenericEnum(
+                            name,
+                            location.clone(),
+                            enum_.generic_parameters,
+                        ));
+                    }
+                    return Ok(Type::Enum(name, location.clone()));
+                }
+                return Err(HarmonyError::new(
+                    HarmonyErrorKind::Semantic,
+                    format!("Variable '{}' is not defined", identifier),
+                    None,
+                    location.clone(),
+                ));
+            }
+            Expression::Char(_, location) => Ok(Type::Char(location.clone())),
+            Expression::Integer(value, location) => {
+                if *value > i32::MAX as i64 || *value < i32::MIN as i64 {
+                    return Err(HarmonyError::new(
+                        HarmonyErrorKind::Semantic,
+                        format!("Integer literal '{}' is too large", value),
+                        Some("Consider using the BigInt type instead".to_string()),
+                        location.clone(),
+                    ));
+                }
+                Ok(Type::Int(location.clone()))
+            }
+            Expression::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                let condition_type = self.check_expression(condition, &mut local_scope.clone())?;
+                if let Type::Bool(_) = condition_type {
+                    let then_type = self.check_expression(then_branch, &mut local_scope.clone())?;
+                    let else_type = self.check_expression(else_branch, &mut local_scope.clone())?;
+                    if then_type == else_type {
+                        return Ok(then_type);
+                    }
+                    return Err(HarmonyError::new(
+                        HarmonyErrorKind::Semantic,
+                        format!(
+                            "If statement branches have mismatched types '{}' and '{}'",
+                            then_type, else_type
+                        ),
+                        None,
+                        expression.location(),
+                    ));
+                }
+                return Err(HarmonyError::new(
+                    HarmonyErrorKind::Semantic,
+                    format!(
+                        "If statement condition has type '{}', expected 'Bool'",
+                        condition_type
+                    ),
+                    None,
+                    expression.location(),
+                ));
+            }
+            Expression::Call { callee, arguments } => {
+                let callee: String = callee.0.clone();
+                if !self.global_scope.function_names.contains_key(&callee) {
+                    if self.global_scope.enum_variants.contains_key(&callee) {
+                        let enum_id: EnumId = self
+                            .global_scope
+                            .enum_variants
+                            .get(&callee)
+                            .unwrap()
+                            .clone();
+                        let enum_: Enum = self.global_scope.enums.get(&enum_id).unwrap().clone();
+                        let name: String = enum_.name.clone();
+                        // TODO: make sure to only add the arguments if the call expression is coming
+                        //       from a pattern match expression.
+                        for (i, argument) in arguments.iter().enumerate() {
+                            if let Expression::Identifier(id, location) = argument.clone() {
+                                for variant in enum_.variants.clone() {
+                                    if let EnumVariant::Tuple(variant_name, _, types) = variant {
+                                        println!("{} {}", id, variant_name);
+                                        let ty: Type = types.get(i).unwrap().clone();
+                                        local_scope.variables.insert(
+                                            id.clone(),
+                                            Variable {
+                                                name: id.clone(),
+                                                type_: ty,
+                                                location: location.clone(),
+                                                value: None,
+                                            },
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        if enum_.generic_parameters.len() > 0 {
+                            return Ok(Type::GenericEnum(
+                                name,
+                                expression.location().clone(),
+                                enum_.generic_parameters,
+                            ));
+                        }
+                        return Ok(Type::Enum(name, expression.location().clone()));
+                    }
+                    return Err(HarmonyError::new(
+                        HarmonyErrorKind::Semantic,
+                        format!("Function '{}' is not defined", callee),
+                        None,
+                        expression.location(),
+                    ));
+                }
+                let function_id: FunctionId = self
+                    .global_scope
+                    .function_names
+                    .get(&callee)
+                    .unwrap()
+                    .clone();
+                let callee_type = self
+                    .global_scope
+                    .functions
+                    .get(&function_id)
+                    .unwrap()
+                    .clone()
+                    .return_type
+                    .clone();
+                let mut argument_types = Vec::new();
+                for argument in arguments {
+                    let argument_type =
+                        self.check_expression(argument, &mut local_scope.clone())?;
+                    argument_types.push(argument_type);
+                }
+
+                Ok(callee_type)
+            }
+            Expression::PatternMatch {
+                expression,
+                cases,
+                default_case,
+            } => {
+                let expression_type =
+                    self.check_expression(expression, &mut local_scope.clone())?;
+                println!("{:?}", expression);
+                let mut case_types = Vec::new();
+                let mut case_body_types = Vec::new();
+                for case in cases {
+                    let mut case_scope = local_scope.clone();
+                    let case_type = self.check_expression(&case.pattern, &mut case_scope)?;
+                    let case_body_type = self.check_expression(&case.body, &mut case_scope)?;
+                    if case_type != expression_type {
+                        return Err(HarmonyError::new(
+                            HarmonyErrorKind::Semantic,
+                            format!(
+                                "Pattern match case has type '{}', expected '{}'",
+                                case_type, expression_type
+                            ),
+                            None,
+                            case.pattern.location(),
+                        ));
+                    }
+                    case_types.push(case_type);
+                    case_body_types.push(case_body_type);
+                }
+                if let Some(default_case) = default_case {
+                    let mut default_case_scope = local_scope.clone();
+                    let default_case_type =
+                        self.check_expression(default_case, &mut default_case_scope)?;
+                    println!("{} {:?}", default_case_type, default_case_type);
+                    if default_case_type != case_body_types[0].clone() {
+                        return Err(HarmonyError::new(
+                            HarmonyErrorKind::Semantic,
+                            format!(
+                                "Pattern match default case has type '{}', expected '{}'",
+                                default_case_type,
+                                case_body_types[0].clone()
+                            ),
+                            None,
+                            default_case.location(),
+                        ));
+                    }
+                }
+                if case_body_types.len() > 0 {
+                    return Ok(case_body_types[0].clone());
+                }
+                return Err(HarmonyError::new(
+                    HarmonyErrorKind::Semantic,
+                    "Pattern match has no cases".to_string(),
+                    None,
+                    expression.location(),
+                ));
+            }
+            Expression::Access {
+                name: name_,
+                member,
+            } => {
+                println!("{:?}", self.global_scope.function_names);
+                let name: String = name_.0.clone();
+                let location = name_.1.clone();
+                for import in self.global_scope.imports.iter() {
+                    if import.alias.is_some() {
+                        let alias: String = import.alias.clone().unwrap();
+                        if alias == name {
+                            return Ok(self.check_expression(&*member, &mut local_scope.clone())?);
+                        }
+                    } else {
+                        return Err(HarmonyError::new(
+                            HarmonyErrorKind::Semantic,
+                            format!("Import '{}' doesn't have an alias.", import.name),
+                            Some(
+                                "This is currently a bug and will be fixed in the future."
+                                    .to_string(),
+                            ),
+                            expression.location(),
+                        ));
+                    }
+                }
+                Err(HarmonyError::new(
+                    HarmonyErrorKind::Semantic,
+                    format!("Import '{}' not found.", name),
+                    None,
+                    location,
+                ))
+            }
+            Expression::Index { expression, index } => {
+                let expression_type =
+                    self.check_expression(expression, &mut local_scope.clone())?;
+                let index_type = self.check_expression(index, &mut local_scope.clone())?;
+                if let Type::String(location) = expression_type {
+                    if let Type::Int(_) = index_type {
+                        return Ok(Type::Char(location));
+                    }
+                    return Err(HarmonyError::new(
+                        HarmonyErrorKind::Semantic,
+                        format!("String index has type '{}', expected 'Int'", index_type),
+                        None,
+                        expression.location(),
+                    ));
+                }
+                // if let Type::Array(_, location) = expression_type {
+                //     if let Type::Int(_) = index_type {
+                //         return Ok(Type::Any(location));
+                //     }
+                //     return Err(HarmonyError::new(
+                //         HarmonyErrorKind::Semantic,
+                //         format!("Array index has type '{}', expected 'Int'", index_type),
+                //         None,
+                //         expression.location(),
+                //     ));
+                // }
+                return Err(HarmonyError::new(
+                    HarmonyErrorKind::Semantic,
+                    format!(
+                        "Index expression has type '{}', expected 'String' or 'Array'",
+                        expression_type
+                    ),
+                    None,
+                    expression.location(),
+                ));
+            }
+            Expression::Bool(_, _) => Ok(Type::Bool(expression.location().clone())),
+            Expression::List(elements) => {
+                let mut element_types = Vec::new();
+                let mut found_elements: Vec<Expression> = Vec::new();
+                for element in elements {
+                    if let Expression::Rest(name) = element {
+                        // get the rest of the elements
+                        let mut rest_elements = Vec::new();
+                        let mut found_rest = false;
+                        for element in elements {
+                            if let Expression::Rest(_) = element {
+                                found_rest = true;
+                                continue;
+                            }
+                            if found_rest {
+                                rest_elements.push(element.clone());
+                            }
+                        }
+                        let value = Expression::List(rest_elements);
+                        let rest_type = self.check_expression(&value, &mut local_scope.clone())?;
+                        if let Expression::Identifier(name, loc) = *name.clone() {
+                            local_scope.variables.insert(
+                                name.clone(),
+                                Variable {
+                                    name: name.clone(),
+                                    type_: rest_type.clone(),
+                                    location: loc.clone(),
+                                    value: Some(value.clone()),
+                                },
+                            );
+                        }
+                        break;
+                    }
+                    found_elements.push(element.clone());
+                    let element_type = self.check_expression(element, &mut local_scope.clone())?;
+                    element_types.push(element_type);
+                }
+                if element_types.len() > 0 {
+                    return Ok(Type::List(Some(Box::new(element_types[0].clone()))));
+                }
+                Ok(Type::List(Some(Box::new(Type::Any(
+                    expression.location().clone(),
+                )))))
+            }
+            Expression::Rest(_) => Err(HarmonyError::new(
+                HarmonyErrorKind::Semantic,
+                "Rest expression not allowed here.".to_string(),
+                Some("Rest expressions are only allowed in lists.".to_string()),
+                expression.location(),
+            )),
+            Expression::String(_, _) => Ok(Type::String(expression.location().clone())),
             _ => {
                 dbg!(expression);
                 todo!("check_expression")
@@ -308,6 +957,7 @@ pub struct Enum {
     pub name: String,
     pub variants: Vec<EnumVariant>,
     pub location: SourceLocation,
+    pub generic_parameters: Vec<Type>,
 }
 
 #[derive(Debug, Clone)]
@@ -316,8 +966,9 @@ pub struct Function {
     pub location: SourceLocation,
     pub parameters: Vec<Parameter>,
     pub return_type: Type,
-    pub body: Expression,
+    pub body: Option<Expression>,
     pub local_scope: LocalScope,
+    pub is_external: bool,
 }
 
 #[derive(Debug, Clone)]
