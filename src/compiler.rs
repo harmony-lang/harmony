@@ -3,6 +3,7 @@ use std::{collections::HashMap, ops::ControlFlow, path::PathBuf, time::Instant};
 use crate::{
     ast::Statement,
     checker::{Checker, Import, Scope},
+    codegen::Codegen,
     error::{HarmonyError, HarmonyErrorKind},
     parser::Parser,
     token::{Token, TokenKind},
@@ -121,6 +122,13 @@ impl Compiler {
                 return ControlFlow::Break(());
             }
         }
+
+        println!(" -> Codegen {}..", file);
+
+        let mut codegen: Codegen = Codegen::new(&statements.unwrap(), &checker);
+        let code: String = codegen.generate();
+
+        std::fs::write(file.clone().replace(".harm", ".mjs"), code).unwrap();
 
         println!("Compiled {} in {:?}!", file, now.elapsed());
 

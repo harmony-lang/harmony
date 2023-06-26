@@ -1,0 +1,16 @@
+module Test
+
+import Console.IO as Console
+
+enum Maybe<T>
+    = Just(T)
+    | Nothing
+
+fun test(x: Maybe<int>) -> unit =
+    case x of
+        | Just(x) => Console.println(x)
+        | Nothing => Console.println("Nothing")
+    end
+
+fun main =
+    test(Just(1))

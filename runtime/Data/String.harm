@@ -1,10 +1,8 @@
 module Data.String
 
-import Data.Maybe as Maybe
+import Data.Maybe as Maybe exposing (Just, Nothing)
 
-fun length(s: string) -> int =
-    0 -- TODO: implement
-
+extern fun length(s: string) -> int = "%0.length"
 
 fun get(s: string, i: int) -> Maybe<char> =
     if i < 0 || i >= length(s) then Nothing

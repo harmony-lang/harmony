@@ -1,4 +1,4 @@
 module Console.IO
 
-extern fun println(s: any) -> unit = "console.log"
+extern fun println(s: any) -> unit = "console.log(%0)"
 

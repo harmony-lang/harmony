@@ -459,7 +459,7 @@ impl Checker {
         }
     }
 
-    fn check_expression(
+    pub fn check_expression(
         &mut self,
         expression: &Expression,
         local_scope: &mut LocalScope,
@@ -626,7 +626,6 @@ impl Checker {
                 if let Some(variable) = local_scope.variables.get(identifier) {
                     return Ok(variable.type_.clone());
                 }
-                println!("{} {:?}", identifier, self.global_scope.enum_variants);
                 if let Some(enum_id) = self.global_scope.enum_variants.get(identifier) {
                     let enum_: Enum = self.global_scope.enums.get(&enum_id).unwrap().clone();
                     let name: String = enum_.name.clone();
@@ -707,8 +706,7 @@ impl Checker {
                         for (i, argument) in arguments.iter().enumerate() {
                             if let Expression::Identifier(id, location) = argument.clone() {
                                 for variant in enum_.variants.clone() {
-                                    if let EnumVariant::Tuple(variant_name, _, types) = variant {
-                                        println!("{} {}", id, variant_name);
+                                    if let EnumVariant::Tuple(_, _, types) = variant {
                                         let ty: Type = types.get(i).unwrap().clone();
                                         local_scope.variables.insert(
                                             id.clone(),
@@ -769,7 +767,6 @@ impl Checker {
             } => {
                 let expression_type =
                     self.check_expression(expression, &mut local_scope.clone())?;
-                println!("{:?}", expression);
                 let mut case_types = Vec::new();
                 let mut case_body_types = Vec::new();
                 for case in cases {
@@ -794,7 +791,6 @@ impl Checker {
                     let mut default_case_scope = local_scope.clone();
                     let default_case_type =
                         self.check_expression(default_case, &mut default_case_scope)?;
-                    println!("{} {:?}", default_case_type, default_case_type);
                     if default_case_type != case_body_types[0].clone() {
                         return Err(HarmonyError::new(
                             HarmonyErrorKind::Semantic,
@@ -822,7 +818,6 @@ impl Checker {
                 name: name_,
                 member,
             } => {
-                println!("{:?}", self.global_scope.function_names);
                 let name: String = name_.0.clone();
                 let location = name_.1.clone();
                 for import in self.global_scope.imports.iter() {
