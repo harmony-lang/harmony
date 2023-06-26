@@ -860,17 +860,17 @@ impl Checker {
                         expression.location(),
                     ));
                 }
-                // if let Type::Array(_, location) = expression_type {
-                //     if let Type::Int(_) = index_type {
-                //         return Ok(Type::Any(location));
-                //     }
-                //     return Err(HarmonyError::new(
-                //         HarmonyErrorKind::Semantic,
-                //         format!("Array index has type '{}', expected 'Int'", index_type),
-                //         None,
-                //         expression.location(),
-                //     ));
-                // }
+                if let Type::List(_) = expression_type {
+                    if let Type::Int(location) = index_type {
+                        return Ok(Type::Any(location));
+                    }
+                    return Err(HarmonyError::new(
+                        HarmonyErrorKind::Semantic,
+                        format!("Array index has type '{}', expected 'Int'", index_type),
+                        None,
+                        expression.location(),
+                    ));
+                }
                 return Err(HarmonyError::new(
                     HarmonyErrorKind::Semantic,
                     format!(
@@ -932,6 +932,39 @@ impl Checker {
                 expression.location(),
             )),
             Expression::String(_, _) => Ok(Type::String(expression.location().clone())),
+            Expression::Let {
+                name,
+                type_annotation,
+                value,
+                body,
+            } => {
+                let value_type = self.check_expression(value, &mut local_scope.clone())?;
+                if let Some(type_annotation) = type_annotation {
+                    if type_annotation != &value_type {
+                        return Err(HarmonyError::new(
+                            HarmonyErrorKind::Semantic,
+                            format!(
+                                "Let expression has type '{}', expected '{}'",
+                                value_type, type_annotation
+                            ),
+                            None,
+                            expression.location(),
+                        ));
+                    }
+                }
+                let name_: String = name.0.clone();
+                let location = name.1.clone();
+                local_scope.variables.insert(
+                    name_.clone(),
+                    Variable {
+                        name: name_.clone(),
+                        type_: value_type.clone(),
+                        location: location.clone(),
+                        value: Some(*value.clone()),
+                    },
+                );
+                self.check_expression(body, &mut local_scope.clone())
+            }
             _ => {
                 dbg!(expression);
                 todo!("check_expression")

@@ -1,0 +1,8 @@
+module LetIn
+
+import Console.IO as Console
+
+fun main =
+    let x: int = 1 in
+    let y: int = 2 in
+    Console.println (x + y)

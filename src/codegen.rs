@@ -404,6 +404,17 @@ impl Codegen {
                 let name: String = self.generate_expression(&*name);
                 format!("...{}", name)
             }
+            Expression::Let {
+                name,
+                type_annotation: _,
+                value,
+                body,
+            } => {
+                let name: String = name.0.clone();
+                let value: String = self.generate_expression(value);
+                let body: String = self.generate_expression(body);
+                format!("(({}) => {})({})", name, body, value)
+            }
             _ => todo!("generate_expression not implemented for {:?}", expression),
         }
     }

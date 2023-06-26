@@ -77,6 +77,12 @@ pub enum Expression {
         expression: Box<Expression>,
         index: Box<Expression>,
     },
+    Let {
+        name: (String, SourceLocation),
+        type_annotation: Option<Type>,
+        value: Box<Expression>,
+        body: Box<Expression>,
+    },
 }
 
 impl Expression {
@@ -102,6 +108,7 @@ impl Expression {
             Expression::Index { expression, index } => {
                 expression.location().merge(&index.location())
             }
+            Expression::Let { name, body, .. } => name.1.merge(&body.location()),
         }
     }
 }

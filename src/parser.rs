@@ -441,6 +441,26 @@ impl Parser {
                 let expression: Expression = self.parse_expression()?;
                 Ok(Expression::Rest(Box::new(expression)))
             }
+            TokenKind::Let => {
+                self.expect(TokenKind::Let)?;
+                let location: SourceLocation = self.current()?.location;
+                let name = self.expect(TokenKind::Identifier)?.lexeme;
+                let mut ty: Option<Type> = None;
+                if self.current()?.kind == TokenKind::Colon {
+                    self.expect(TokenKind::Colon)?;
+                    ty = Some(self.parse_type()?);
+                }
+                self.expect(TokenKind::Equals)?;
+                let value: Expression = self.parse_expression()?;
+                self.expect(TokenKind::In)?;
+                let body: Expression = self.parse_expression()?;
+                Ok(Expression::Let {
+                    name: (name, location),
+                    type_annotation: ty,
+                    value: Box::new(value),
+                    body: Box::new(body),
+                })
+            }
             _ => Err(HarmonyError::new(
                 HarmonyErrorKind::Syntax,
                 format!("Expected expression, found {:?}", self.current()?.kind),

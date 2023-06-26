@@ -39,49 +39,8 @@ fun tokenize_input(input: string, index: int, tokens: [Token]) -> Maybe<[Token]>
 fun tokenize(input: string) -> Maybe<[Token]> =
     tokenize_input(input, 0, [])
 
--- enum Expression
---     = ExprNumber(int)
---     | ExprAdd(Expression, Expression)
---     | ExprSub(Expression, Expression)
---     | ExprMul(Expression, Expression)
---     | ExprDiv(Expression, Expression)
-
--- fun parse(tokens: [Token]) -> Result<Expression, string> =
---     case tokens of
---         | [] => Failure("Unexpected end of input")
---         | [TkNumber(n)] => Success(ExprNumber(n))
---         | [TkLParen, ..rest] => case parse(rest) of
---             | Success(expr) => case rest of
---                 | [TkRParen, ..rest] => Success(expr)
---                 | else => Failure("Expected ')'")
---             end
---             | Failure(error) => Failure(error)
---         end
---         | [TkNumber(n), TkPlus, ..rest] => case parse(rest) of
---             | Success(expr) => Success(ExprAdd(ExprNumber(n), expr))
---             | Failure(error) => Failure(error)
---         end
---         | [TkNumber(n), TkMinus, ..rest] => case parse(rest) of
---             | Success(expr) => Success(ExprSub(ExprNumber(n), expr))
---             | Failure(error) => Failure(error)
---         end
---         | [TkNumber(n), TkTimes, ..rest] => case parse(rest) of
---             | Success(expr) => Success(ExprMul(ExprNumber(n), expr))
---             | Failure(error) => Failure(error)
---         end
---         | [TkNumber(n), TkDiv, ..rest] => case parse(rest) of
---             | Success(expr) => Success(ExprDiv(ExprNumber(n), expr))
---             | Failure(error) => Failure(error)
---         end
---         | else => Failure("Unexpected token")
---     end
-
 fun main =
     case tokenize("1+2*3") of
         | Just(tokens) => Console.println(tokens)
-        -- case parse(tokens) of
-        --     | Success(expr) => Console.println(expr)
-        --     | Failure(error) => Console.println(error)
-        -- end
         | Nothing => Console.println("Error")
     end

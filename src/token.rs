@@ -69,6 +69,8 @@ pub enum TokenKind {
     If,
     Then,
     Else,
+    Let,
+    In,
 
     // Types
     Int,
@@ -140,6 +142,8 @@ impl Display for TokenKind {
             TokenKind::If => write!(f, "if"),
             TokenKind::Then => write!(f, "then"),
             TokenKind::Else => write!(f, "else"),
+            TokenKind::Let => write!(f, "let"),
+            TokenKind::In => write!(f, "in"),
             TokenKind::Int => write!(f, "int"),
             TokenKind::Float => write!(f, "float"),
             TokenKind::String => write!(f, "string"),

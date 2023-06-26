@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::ControlFlow, path::PathBuf, time::Instant};
+use std::{collections::HashMap, ops::ControlFlow, path::PathBuf, process::Command, time::Instant};
 
 use crate::{
     ast::Statement,
@@ -30,13 +30,13 @@ impl Compiler {
 
     pub fn compile(&mut self) {
         for file in self.files.clone() {
-            if let ControlFlow::Break(_) = self.compile_file(&file) {
+            if let ControlFlow::Break(_) = self.compile_file(&file, false) {
                 continue;
             }
         }
     }
 
-    fn compile_file(&mut self, file: &String) -> ControlFlow<()> {
+    fn compile_file(&mut self, file: &String, is_import: bool) -> ControlFlow<()> {
         let now: Instant = Instant::now();
         if self.compiled_files.contains_key(file) {
             println!("Already compiled {}", file);
@@ -90,7 +90,7 @@ impl Compiler {
                     }
                     let full_path: String = full_path.unwrap();
                     if !self.compiled_files.contains_key(&full_path) {
-                        if let ControlFlow::Break(_) = self.compile_file(&full_path) {
+                        if let ControlFlow::Break(_) = self.compile_file(&full_path, true) {
                             continue;
                         }
                     }
@@ -129,8 +129,16 @@ impl Compiler {
         let code: String = codegen.generate();
 
         std::fs::write(file.clone().replace(".harm", ".mjs"), code).unwrap();
-
         println!("Compiled {} in {:?}!", file, now.elapsed());
+
+        if is_import {
+            return ControlFlow::Continue(());
+        }
+
+        let mut command: Command = Command::new("node");
+        command.arg(file.clone().replace(".harm", ".mjs"));
+        let output: String = String::from_utf8(command.output().unwrap().stdout).unwrap();
+        println!(" => {}", output);
 
         ControlFlow::Continue(())
     }

@@ -191,6 +191,8 @@ impl Tokenizer {
                             "if" => self.add_token(TokenKind::If, identifier),
                             "then" => self.add_token(TokenKind::Then, identifier),
                             "else" => self.add_token(TokenKind::Else, identifier),
+                            "let" => self.add_token(TokenKind::Let, identifier),
+                            "in" => self.add_token(TokenKind::In, identifier),
                             "int" => self.add_token(TokenKind::Int, identifier),
                             "float" => self.add_token(TokenKind::Float, identifier),
                             "string" => self.add_token(TokenKind::String, identifier),
