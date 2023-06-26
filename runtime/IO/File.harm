@@ -1,0 +1,6 @@
+module IO.File
+
+foreign import "fs" exposing (readFileSync)
+
+foreign fun read(s: string) -> string = 
+    "readFileSync(%0, function(err, data) { if (err) throw err; return data; })"

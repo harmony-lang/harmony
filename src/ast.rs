@@ -13,7 +13,11 @@ pub enum Statement {
         alias: Option<(String, SourceLocation)>,
         exposing: Vec<(String, SourceLocation)>,
     },
-    ExternFunction {
+    ForeignImport {
+        name: (String, SourceLocation),
+        exposing: Vec<(String, SourceLocation)>,
+    },
+    ForeignFunction {
         name: (String, SourceLocation),
         parameters: Vec<Parameter>,
         return_type: Option<Type>,

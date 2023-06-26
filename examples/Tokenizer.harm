@@ -1,6 +1,6 @@
 module Tokenizer
 
-import Console.IO as Console
+import IO.Console as Console
 import Data.Char as Char
 import Data.Maybe as Maybe exposing (Just, Nothing)
 import Data.String as String

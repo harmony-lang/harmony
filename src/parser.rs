@@ -31,7 +31,7 @@ impl Parser {
             TokenKind::Import => self.parse_import(),
             TokenKind::Fun => self.parse_function(),
             TokenKind::Enum => self.parse_enum(),
-            TokenKind::Extern => self.parse_extern(),
+            TokenKind::Foreign => self.parse_foreign(),
             _ => Err(HarmonyError::new(
                 HarmonyErrorKind::Syntax,
                 format!("Expected statement, found {:?}", self.current()?.kind),
@@ -232,26 +232,40 @@ impl Parser {
         Ok(EnumVariant::Unit(name, location))
     }
 
-    fn parse_extern(&mut self) -> Result<Statement, HarmonyError> {
-        self.expect(TokenKind::Extern)?;
-        self.expect(TokenKind::Fun)?;
+    fn parse_foreign(&mut self) -> Result<Statement, HarmonyError> {
+        self.expect(TokenKind::Foreign)?;
         let location: SourceLocation = self.current()?.location;
-        let name = self.expect(TokenKind::Identifier)?.lexeme;
-        let mut parameters: Vec<Parameter> = vec![];
-        let mut return_type: Option<Type> = None;
-        if !self.is_at_end() && self.current()?.kind == TokenKind::OpenParenthesis {
-            self.expect(TokenKind::OpenParenthesis)?;
-            if !self.is_at_end() && self.current()?.kind == TokenKind::Identifier {
+        if self.current()?.kind == TokenKind::Import {
+            self.expect(TokenKind::Import)?;
+            let location: SourceLocation = self.current()?.location;
+            let name = self.expect(TokenKind::StringLiteral)?.lexeme;
+            let mut exposing: Vec<(String, SourceLocation)> = vec![];
+            if !self.is_at_end() && self.current()?.kind == TokenKind::Exposing {
+                self.expect(TokenKind::Exposing)?;
+                self.expect(TokenKind::OpenParenthesis)?;
+
                 let location: SourceLocation = self.current()?.location;
-                let identifier = self.expect(TokenKind::Identifier)?.lexeme;
-                self.expect(TokenKind::Colon)?;
-                let type_ = self.parse_type()?;
-                parameters.push(Parameter {
-                    name: (identifier, location),
-                    type_,
-                });
+                exposing.push((self.expect(TokenKind::Identifier)?.lexeme, location));
                 while !self.is_at_end() && self.current()?.kind == TokenKind::Comma {
                     self.expect(TokenKind::Comma)?;
+                    let location: SourceLocation = self.current()?.location;
+                    exposing.push((self.expect(TokenKind::Identifier)?.lexeme, location));
+                }
+                self.expect(TokenKind::CloseParenthesis)?;
+            }
+            return Ok(Statement::ForeignImport {
+                name: (name, location),
+                exposing,
+            });
+        } else if self.current()?.kind == TokenKind::Fun {
+            self.expect(TokenKind::Fun)?;
+            let location: SourceLocation = self.current()?.location;
+            let name = self.expect(TokenKind::Identifier)?.lexeme;
+            let mut parameters: Vec<Parameter> = vec![];
+            let mut return_type: Option<Type> = None;
+            if !self.is_at_end() && self.current()?.kind == TokenKind::OpenParenthesis {
+                self.expect(TokenKind::OpenParenthesis)?;
+                if !self.is_at_end() && self.current()?.kind == TokenKind::Identifier {
                     let location: SourceLocation = self.current()?.location;
                     let identifier = self.expect(TokenKind::Identifier)?.lexeme;
                     self.expect(TokenKind::Colon)?;
@@ -260,21 +274,38 @@ impl Parser {
                         name: (identifier, location),
                         type_,
                     });
+                    while !self.is_at_end() && self.current()?.kind == TokenKind::Comma {
+                        self.expect(TokenKind::Comma)?;
+                        let location: SourceLocation = self.current()?.location;
+                        let identifier = self.expect(TokenKind::Identifier)?.lexeme;
+                        self.expect(TokenKind::Colon)?;
+                        let type_ = self.parse_type()?;
+                        parameters.push(Parameter {
+                            name: (identifier, location),
+                            type_,
+                        });
+                    }
                 }
+                self.expect(TokenKind::CloseParenthesis)?;
+                self.expect(TokenKind::Arrow)?;
+                return_type = Some(self.parse_type()?);
             }
-            self.expect(TokenKind::CloseParenthesis)?;
-            self.expect(TokenKind::Arrow)?;
-            return_type = Some(self.parse_type()?);
+            self.expect(TokenKind::Equals)?;
+            let binding_location: SourceLocation = self.current()?.location;
+            let binding: String = self.expect(TokenKind::StringLiteral)?.lexeme;
+            return Ok(Statement::ForeignFunction {
+                name: (name, location),
+                parameters,
+                return_type,
+                binding: (binding, binding_location),
+            });
         }
-        self.expect(TokenKind::Equals)?;
-        let binding_location: SourceLocation = self.current()?.location;
-        let binding: String = self.expect(TokenKind::StringLiteral)?.lexeme;
-        Ok(Statement::ExternFunction {
-            name: (name, location),
-            parameters,
-            return_type,
-            binding: (binding, binding_location),
-        })
+        Err(HarmonyError::new(
+            HarmonyErrorKind::Syntax,
+            "Expected 'import' or 'fun' after 'foreign'".to_string(),
+            None,
+            location,
+        ))
     }
 
     fn parse_expression(&mut self) -> Result<Expression, HarmonyError> {

@@ -137,9 +137,18 @@ impl Compiler {
 
         let mut command: Command = Command::new("node");
         command.arg(file.clone().replace(".harm", ".mjs"));
-        let output: String = String::from_utf8(command.output().unwrap().stdout).unwrap();
-        println!(" => {}", output);
-
+        if command.output().unwrap().status.success() {
+            println!(
+                " => {}",
+                String::from_utf8(command.output().unwrap().stdout).unwrap()
+            );
+            return ControlFlow::Continue(());
+        } else {
+            println!(
+                " => {}",
+                String::from_utf8(command.output().unwrap().stderr).unwrap()
+            );
+        }
         ControlFlow::Continue(())
     }
 }

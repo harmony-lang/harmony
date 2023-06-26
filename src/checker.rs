@@ -257,7 +257,11 @@ impl Checker {
                 alias: _,
                 exposing: _,
             } => Ok(()),
-            Statement::ExternFunction {
+            Statement::ForeignImport {
+                name: _,
+                exposing: _,
+            } => Ok(()),
+            Statement::ForeignFunction {
                 name,
                 parameters,
                 return_type,

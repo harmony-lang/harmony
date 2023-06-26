@@ -78,6 +78,20 @@ impl Codegen {
                     }
                 }
             }
+            Statement::ForeignImport { name, exposing } => {
+                let exposing: Vec<String> = exposing
+                    .iter()
+                    .map(|(name, _)| name.to_string())
+                    .collect::<Vec<String>>();
+                code.push_str(
+                    format!(
+                        "import {{ {} }} from \"{}\";\n",
+                        exposing.join(", "),
+                        name.0.clone()
+                    )
+                    .as_str(),
+                );
+            }
             Statement::Enum { name, variants } => {
                 code.push_str(format!("export const {} = {{\n", name.0.clone()).as_str());
                 for variant in variants {
@@ -166,7 +180,7 @@ impl Codegen {
                     }
                 }
             }
-            Statement::ExternFunction {
+            Statement::ForeignFunction {
                 name,
                 parameters,
                 return_type: _,
@@ -182,22 +196,13 @@ impl Codegen {
                 code.push_str(
                     format!("export var {} = ({}) => {{\n", name, args.join(", ")).as_str(),
                 );
-                let mut placeholders: Vec<String> = Vec::new();
-                binding.find("%").map(|index| {
-                    let mut binding: String = binding.clone();
-                    binding.replace_range(index..index + 1, "arg");
-                    placeholders.push(binding);
-                });
-                if placeholders.len() == 0 {
-                    code.push_str(
-                        format!("    return {}({});\n", binding, args.join(", ")).as_str(),
-                    );
-                } else {
-                    code.push_str(
-                        format!("    return {};\n", placeholders.join(", ").replace("%", ""))
-                            .as_str(),
-                    );
-                }
+                // if placeholders.len() == 0 {
+                //     code.push_str(
+                //         format!("    return {}({});\n", binding, args.join(", ")).as_str(),
+                //     );
+                // } else {
+                code.push_str(format!("    return {};\n", binding.replace("%", "arg")).as_str());
+                // }
                 code.push_str("}\n");
             }
             Statement::Function {

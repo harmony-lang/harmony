@@ -2,8 +2,10 @@ module Data.String
 
 import Data.Maybe as Maybe exposing (Just, Nothing)
 
-extern fun length(s: string) -> int = "%0.length"
+foreign fun length(s: string) -> int = "%0.length"
 
 fun get(s: string, i: int) -> Maybe<char> =
     if i < 0 || i >= length(s) then Nothing
     else Just (s[i])
+
+foreign fun split(s: string, delim: string) -> [string] = "%0.split(%1)"

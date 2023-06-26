@@ -1,7 +1,9 @@
 module Input
 
-import Console.IO as IO
+import IO.Console as Console
+import IO.File as File
+import Data.String as String
 
 fun main =
-    let x = IO.getLine() in
-    IO.println("Hello " ++ x ++ "!")
+    let contents = File.read ("examples/Input.harm") in
+    Console.println (contents)

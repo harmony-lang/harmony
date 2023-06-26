@@ -1,0 +1,4 @@
+module IO.Console
+
+foreign fun print(s: any) -> unit = "process.stdout.write(%0)"
+foreign fun println(s: any) -> unit = "process.stdout.write(%0 + \"\n\")"

@@ -135,7 +135,44 @@ impl Tokenizer {
                 '"' => {
                     let mut string = String::new();
                     while self.peek() != Some('"') && !self.is_at_end() {
-                        string.push(self.next().unwrap());
+                        if self.peek() == Some('\\') {
+                            self.next();
+                            match self.peek() {
+                                Some('n') => {
+                                    self.next();
+                                    string.push_str("\\n");
+                                }
+                                Some('t') => {
+                                    self.next();
+                                    string.push_str("\\t");
+                                }
+                                Some('r') => {
+                                    self.next();
+                                    string.push_str("\\r");
+                                }
+                                Some('\\') => {
+                                    self.next();
+                                    string.push_str("\\\\");
+                                }
+                                Some('"') => {
+                                    self.next();
+                                    string.push_str("\"");
+                                }
+                                Some('\'') => {
+                                    self.next();
+                                    string.push_str("'");
+                                }
+                                Some('0') => {
+                                    self.next();
+                                    string.push_str("\\0");
+                                }
+                                _ => {
+                                    panic!("Invalid escape sequence");
+                                }
+                            }
+                        } else {
+                            string.push(self.next().unwrap());
+                        }
                     }
                     if self.is_at_end() {
                         panic!("Unterminated string");
@@ -182,7 +219,7 @@ impl Tokenizer {
                             "import" => self.add_token(TokenKind::Import, identifier),
                             "as" => self.add_token(TokenKind::As, identifier),
                             "exposing" => self.add_token(TokenKind::Exposing, identifier),
-                            "extern" => self.add_token(TokenKind::Extern, identifier),
+                            "foreign" => self.add_token(TokenKind::Foreign, identifier),
                             "enum" => self.add_token(TokenKind::Enum, identifier),
                             "fun" => self.add_token(TokenKind::Fun, identifier),
                             "case" => self.add_token(TokenKind::Case, identifier),

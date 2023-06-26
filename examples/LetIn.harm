@@ -1,6 +1,6 @@
 module LetIn
 
-import Console.IO as Console
+import IO.Console as Console
 
 fun main =
     let x: int = 1 in
