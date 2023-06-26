@@ -1,0 +1,7 @@
+module Input
+
+import Console.IO as IO
+
+fun main =
+    let x = IO.getLine() in
+    IO.println("Hello " ++ x ++ "!")

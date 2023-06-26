@@ -3,7 +3,6 @@ module Tokenizer
 import Console.IO as Console
 import Data.Char as Char
 import Data.Maybe as Maybe exposing (Just, Nothing)
-import Data.Result as Result exposing (Success, Failure)
 import Data.String as String
 
 enum Token

@@ -188,9 +188,16 @@ impl Codegen {
                     binding.replace_range(index..index + 1, "arg");
                     placeholders.push(binding);
                 });
-                code.push_str(
-                    format!("    return {};\n", placeholders.join(", ").replace("%", "")).as_str(),
-                );
+                if placeholders.len() == 0 {
+                    code.push_str(
+                        format!("    return {}({});\n", binding, args.join(", ")).as_str(),
+                    );
+                } else {
+                    code.push_str(
+                        format!("    return {};\n", placeholders.join(", ").replace("%", ""))
+                            .as_str(),
+                    );
+                }
                 code.push_str("}\n");
             }
             Statement::Function {
