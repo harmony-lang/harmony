@@ -370,6 +370,41 @@ impl Codegen {
                                 .as_str(),
                             );
                         }
+                    } else if let Expression::List(elements) = pattern.clone() {
+                        if elements.len() == 0 {
+                            code.push_str("    if (__condition.length === 0) {\n");
+                        } else {
+                            let mut conds: Vec<String> = Vec::new();
+                            for (i, element) in elements.iter().enumerate() {
+                                if let Expression::Rest(_) = element {
+                                    conds.push(format!("__condition.length >= {}", i));
+                                } else {
+                                    conds.push(format!("__condition[{}] !== undefined", i));
+                                }
+                            }
+                            code.push_str(format!("    if ({}) {{\n", conds.join(" && ")).as_str());
+                            for (i, element) in elements.iter().enumerate() {
+                                if let Expression::Rest(id_expr) = element {
+                                    let id: String = self.generate_expression(id_expr);
+                                    code.push_str(
+                                        format!(
+                                            "        const {} = __condition.slice({});\n",
+                                            id, i
+                                        )
+                                        .as_str(),
+                                    );
+                                } else {
+                                    code.push_str(
+                                        format!(
+                                            "        const {} = __condition[{}];\n",
+                                            self.generate_expression(element),
+                                            i
+                                        )
+                                        .as_str(),
+                                    );
+                                }
+                            }
+                        }
                     } else {
                         code.push_str(
                             format!(

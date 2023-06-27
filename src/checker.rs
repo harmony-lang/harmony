@@ -778,6 +778,73 @@ impl Checker {
                 let mut case_body_types = Vec::new();
                 for case in cases {
                     let mut case_scope = local_scope.clone();
+
+                    if let Expression::List(elements) = &case.pattern {
+                        for (_, element) in elements.iter().enumerate() {
+                            if let Expression::Identifier(id, location) = element.clone() {
+                                let element_type: Type = match expression_type.clone() {
+                                    Type::List(inner) => *inner.unwrap(),
+                                    _ => {
+                                        return Err(HarmonyError::new(
+                                            HarmonyErrorKind::Semantic,
+                                            format!(
+                                                "Pattern match case has type '{}', expected 'List'",
+                                                expression_type
+                                            ),
+                                            None,
+                                            element.location(),
+                                        ))
+                                    }
+                                };
+                                case_scope.variables.insert(
+                                    id.clone(),
+                                    Variable {
+                                        name: id.clone(),
+                                        type_: element_type,
+                                        location: location.clone(),
+                                        value: None,
+                                    },
+                                );
+                            } else if let Expression::Rest(expr) = element.clone() {
+                                if let Expression::Identifier(id, _) = *expr.clone() {
+                                    let element_type: Type = match expression_type.clone() {
+                                        Type::List(inner) => *inner.unwrap(),
+                                        _ => {
+                                            return Err(HarmonyError::new(
+                                                HarmonyErrorKind::Semantic,
+                                                format!(
+                                                "Pattern match case has type '{}', expected 'List'",
+                                                expression_type
+                                            ),
+                                                None,
+                                                element.location(),
+                                            ))
+                                        }
+                                    };
+                                    case_scope.variables.insert(
+                                        id.clone(),
+                                        Variable {
+                                            name: id.clone(),
+                                            type_: element_type,
+                                            location: element.location().clone(),
+                                            value: None,
+                                        },
+                                    );
+                                }
+                            } else {
+                                return Err(HarmonyError::new(
+                                    HarmonyErrorKind::Semantic,
+                                    format!(
+                                        "Pattern match case has type '{}', expected 'List'",
+                                        expression_type
+                                    ),
+                                    None,
+                                    element.location(),
+                                ));
+                            }
+                        }
+                    }
+
                     let case_type = self.check_expression(&case.pattern, &mut case_scope)?;
                     let case_body_type = self.check_expression(&case.body, &mut case_scope)?;
                     if let PatternMatchDirective::If(expression) = &case.directive {
@@ -796,6 +863,9 @@ impl Checker {
                             ));
                         }
                     }
+
+                    println!("{:?}", case_type);
+                    println!("{:?}", expression_type);
                     if case_type != expression_type {
                         return Err(HarmonyError::new(
                             HarmonyErrorKind::Semantic,
