@@ -5,7 +5,7 @@ import IO.Console as Console
 fun length(list: [int]) -> int =
     case list of
         | [] => 0
-        | [x, ..xs] => length (xs) + 1
+        | [_, ..xs] => length (xs) + 1
     end
 
 fun main =

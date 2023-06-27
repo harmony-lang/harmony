@@ -394,13 +394,13 @@ impl Codegen {
                                         .as_str(),
                                     );
                                 } else {
+                                    let id = self.generate_expression(element);
+                                    if id == "_" {
+                                        continue;
+                                    }
                                     code.push_str(
-                                        format!(
-                                            "        const {} = __condition[{}];\n",
-                                            self.generate_expression(element),
-                                            i
-                                        )
-                                        .as_str(),
+                                        format!("        const {} = __condition[{}];\n", id, i)
+                                            .as_str(),
                                     );
                                 }
                             }
