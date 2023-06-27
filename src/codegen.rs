@@ -1,5 +1,5 @@
 use crate::{
-    ast::{EnumVariant, Expression, Statement},
+    ast::{EnumVariant, Expression, PatternMatchDirective, Statement},
     checker::Checker,
     token::TokenKind,
 };
@@ -196,13 +196,7 @@ impl Codegen {
                 code.push_str(
                     format!("export var {} = ({}) => {{\n", name, args.join(", ")).as_str(),
                 );
-                // if placeholders.len() == 0 {
-                //     code.push_str(
-                //         format!("    return {}({});\n", binding, args.join(", ")).as_str(),
-                //     );
-                // } else {
                 code.push_str(format!("    return {};\n", binding.replace("%", "arg")).as_str());
-                // }
                 code.push_str("}\n");
             }
             Statement::Function {
@@ -313,6 +307,7 @@ impl Codegen {
 
                 for case in cases {
                     let pattern: Expression = case.pattern.clone();
+                    let directive: PatternMatchDirective = case.directive.clone();
                     let body: Expression = case.body.clone();
 
                     if let Expression::Call { callee, arguments } = pattern.clone() {
@@ -337,6 +332,19 @@ impl Codegen {
                                     )
                                     .as_str(),
                                 );
+                            }
+
+                            match &directive {
+                                PatternMatchDirective::If(expression) => {
+                                    code.push_str(
+                                        format!(
+                                            "        if ({}) {{\n",
+                                            self.generate_expression(&expression)
+                                        )
+                                        .as_str(),
+                                    );
+                                }
+                                PatternMatchDirective::None => {}
                             }
                         } else {
                             code.push_str(
@@ -376,6 +384,13 @@ impl Codegen {
                         format!("        return {};\n", self.generate_expression(&body)).as_str(),
                     );
                     code.push_str("    }\n");
+
+                    match directive {
+                        PatternMatchDirective::If(_) => {
+                            code.push_str("    }\n");
+                        }
+                        PatternMatchDirective::None => {}
+                    }
                 }
 
                 if default_case.is_none() {

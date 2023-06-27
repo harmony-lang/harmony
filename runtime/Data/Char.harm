@@ -3,5 +3,11 @@ module Data.Char
 fun isDigit(c: char) -> bool =
     c >= '0' && c <= '9'
 
+fun isAlphabetic(c: char) -> bool =
+    c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
+
+fun isWhitespace(c: char) -> bool =
+    c == ' ' || c == '\n' || c == '\r' || c == '\t'
+
 fun toInt(c: char) -> int =
     c - '0'

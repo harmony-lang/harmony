@@ -104,6 +104,9 @@ impl Tokenizer {
                     if self.peek() == Some('>') {
                         self.next();
                         self.add_token(TokenKind::FatArrow, "=>".to_string());
+                    } else if self.peek() == Some('=') {
+                        self.next();
+                        self.add_token(TokenKind::DoubleEquals, "==".to_string());
                     } else {
                         self.add_token(TokenKind::Equals, c.to_string());
                     }
@@ -183,7 +186,44 @@ impl Tokenizer {
                 '\'' => {
                     let mut character = String::new();
                     while self.peek() != Some('\'') && !self.is_at_end() {
-                        character.push(self.next().unwrap());
+                        if self.peek() == Some('\\') {
+                            self.next();
+                            match self.peek() {
+                                Some('n') => {
+                                    self.next();
+                                    character.push_str("\\n");
+                                }
+                                Some('t') => {
+                                    self.next();
+                                    character.push_str("\\t");
+                                }
+                                Some('r') => {
+                                    self.next();
+                                    character.push_str("\\r");
+                                }
+                                Some('\\') => {
+                                    self.next();
+                                    character.push_str("\\\\");
+                                }
+                                Some('"') => {
+                                    self.next();
+                                    character.push_str("\"");
+                                }
+                                Some('\'') => {
+                                    self.next();
+                                    character.push_str("'");
+                                }
+                                Some('0') => {
+                                    self.next();
+                                    character.push_str("\\0");
+                                }
+                                _ => {
+                                    panic!("Invalid escape sequence");
+                                }
+                            }
+                        } else {
+                            character.push(self.next().unwrap());
+                        }
                     }
                     if self.is_at_end() {
                         panic!("Unterminated character");

@@ -60,7 +60,7 @@ pub enum Expression {
     Float(f64, SourceLocation),
     String(String, SourceLocation),
     Bool(bool, SourceLocation),
-    Char(char, SourceLocation),
+    Char(String, SourceLocation),
     PatternMatch {
         expression: Box<Expression>,
         cases: Vec<PatternMatchCase>,
@@ -257,7 +257,14 @@ pub struct Parameter {
 #[derive(Debug, Clone)]
 pub struct PatternMatchCase {
     pub pattern: Expression,
+    pub directive: PatternMatchDirective,
     pub body: Expression,
+}
+
+#[derive(Debug, Clone)]
+pub enum PatternMatchDirective {
+    None,
+    If(Expression),
 }
 
 #[derive(Debug, Clone)]

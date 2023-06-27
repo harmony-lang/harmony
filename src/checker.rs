@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    ast::{EnumVariant, Expression, Parameter, Statement, Type},
+    ast::{EnumVariant, Expression, Parameter, PatternMatchDirective, Statement, Type},
     compiler::Compiler,
     error::{HarmonyError, HarmonyErrorKind},
     token::{SourceLocation, TokenKind},
@@ -599,6 +599,9 @@ impl Checker {
                             if let Type::String(loc2) = right_type {
                                 return Ok(Type::String(loc1.merge(&loc2)));
                             }
+                            if let Type::GenericParameter(_, _) = right_type {
+                                return Ok(Type::String(loc1));
+                            }
                         }
                         if let Type::List(_) = left_type.clone() {
                             if let Type::List(_) = right_type {
@@ -777,6 +780,22 @@ impl Checker {
                     let mut case_scope = local_scope.clone();
                     let case_type = self.check_expression(&case.pattern, &mut case_scope)?;
                     let case_body_type = self.check_expression(&case.body, &mut case_scope)?;
+                    if let PatternMatchDirective::If(expression) = &case.directive {
+                        let expression_type =
+                            self.check_expression(&expression, &mut case_scope.clone())?;
+                        if let Type::Bool(_) = expression_type {
+                        } else {
+                            return Err(HarmonyError::new(
+                                HarmonyErrorKind::Semantic,
+                                format!(
+                                    "Pattern match case directive has type '{}', expected 'bool'",
+                                    expression_type
+                                ),
+                                None,
+                                expression.location(),
+                            ));
+                        }
+                    }
                     if case_type != expression_type {
                         return Err(HarmonyError::new(
                             HarmonyErrorKind::Semantic,

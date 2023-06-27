@@ -1,5 +1,8 @@
 use crate::{
-    ast::{EnumVariant, Expression, Parameter, PatternMatchCase, Statement, Type},
+    ast::{
+        EnumVariant, Expression, Parameter, PatternMatchCase, PatternMatchDirective, Statement,
+        Type,
+    },
     error::{HarmonyError, HarmonyErrorKind},
     token::{SourceLocation, Token, TokenKind},
 };
@@ -408,7 +411,7 @@ impl Parser {
             TokenKind::CharacterLiteral => {
                 let location: SourceLocation = self.current()?.location;
                 let value = self.expect(TokenKind::CharacterLiteral)?.lexeme;
-                Ok(Expression::Char(value.parse::<char>().unwrap(), location))
+                Ok(Expression::Char(value, location))
             }
             TokenKind::BooleanLiteral => {
                 let location: SourceLocation = self.current()?.location;
@@ -423,16 +426,30 @@ impl Parser {
                 let mut default_case: Option<Box<Expression>> = None;
                 while !self.is_at_end() && self.current()?.kind == TokenKind::Pipe {
                     self.expect(TokenKind::Pipe)?;
+                    let mut directive: PatternMatchDirective = PatternMatchDirective::None;
                     if !self.is_at_end() && self.current()?.kind == TokenKind::Else {
                         self.expect(TokenKind::Else)?;
+                        // TODO: parse directives for else case
+                        // if !self.is_at_end() && self.current()?.kind == TokenKind::If {
+                        //     self.expect(TokenKind::If)?;
+                        //     directive = PatternMatchDirective::If(self.parse_expression()?);
+                        // }
                         self.expect(TokenKind::FatArrow)?;
                         default_case = Some(Box::new(self.parse_expression()?));
                         break;
                     }
                     let pattern: Expression = self.parse_expression()?;
+                    if !self.is_at_end() && self.current()?.kind == TokenKind::If {
+                        self.expect(TokenKind::If)?;
+                        directive = PatternMatchDirective::If(self.parse_expression()?);
+                    }
                     self.expect(TokenKind::FatArrow)?;
                     let body: Expression = self.parse_expression()?;
-                    cases.push(PatternMatchCase { pattern, body });
+                    cases.push(PatternMatchCase {
+                        pattern,
+                        directive,
+                        body,
+                    });
                 }
                 self.expect(TokenKind::End)?; // TODO: Make this optional
                 Ok(Expression::PatternMatch {
