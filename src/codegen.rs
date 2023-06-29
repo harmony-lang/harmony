@@ -202,8 +202,14 @@ impl Codegen {
             Statement::Function {
                 name,
                 parameters,
-                return_type: _,
                 body,
+                ..
+            }
+            | Statement::GenericFunction {
+                name,
+                parameters,
+                body,
+                ..
             } => {
                 let name: String = name.clone().0;
                 self.names.push(name.clone());
@@ -277,7 +283,9 @@ impl Codegen {
                 let else_branch: String = self.generate_expression(else_branch);
                 format!("{} ? {} : {}", condition, then_branch, else_branch)
             }
-            Expression::Call { callee, arguments } => {
+            Expression::Call {
+                callee, arguments, ..
+            } => {
                 let callee: String = callee.0.clone();
                 let mut args: Vec<String> = Vec::new();
                 for arg in arguments {
@@ -310,7 +318,10 @@ impl Codegen {
                     let directive: PatternMatchDirective = case.directive.clone();
                     let body: Expression = case.body.clone();
 
-                    if let Expression::Call { callee, arguments } = pattern.clone() {
+                    if let Expression::Call {
+                        callee, arguments, ..
+                    } = pattern.clone()
+                    {
                         if self
                             .checker
                             .global_scope
@@ -476,6 +487,21 @@ impl Codegen {
                 let value: String = self.generate_expression(value);
                 let body: String = self.generate_expression(body);
                 format!("(({}) => {})({})", name, body, value)
+            }
+            Expression::Function {
+                parameters, body, ..
+            } => {
+                let mut code: String = String::new();
+                code.push_str("(");
+                for (i, parameter) in parameters.iter().enumerate() {
+                    if i > 0 {
+                        code.push_str(", ");
+                    }
+                    code.push_str(parameter.name.0.as_str());
+                }
+                code.push_str(") => ");
+                code.push_str(self.generate_expression(body).as_str());
+                code
             }
             _ => todo!("generate_expression not implemented for {:?}", expression),
         }

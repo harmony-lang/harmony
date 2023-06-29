@@ -294,6 +294,7 @@ impl Checker {
 
                 let function: Function = Function {
                     name: name.clone(),
+                    generic_parameters: vec![],
                     parameters: parameters.clone(),
                     return_type: return_type.clone(),
                     body: None,
@@ -342,6 +343,101 @@ impl Checker {
 
                 let function: Function = Function {
                     name: name.clone(),
+                    generic_parameters: vec![],
+                    parameters: parameters.clone(),
+                    return_type: return_type.clone(),
+                    body: Some(body.clone()),
+                    location: location.clone(),
+                    local_scope: local_scope.clone(),
+                    is_external: false,
+                };
+                self.global_scope
+                    .function_names
+                    .insert(name.clone(), function_id);
+                self.global_scope.functions.insert(function_id, function);
+
+                let body_type: Type = self.check_expression(&body, &mut local_scope)?;
+                if body_type != return_type {
+                    return Err(HarmonyError::new(
+                        HarmonyErrorKind::Semantic,
+                        format!(
+                            "Function '{}' return type '{}' does not match body type '{}'",
+                            name, return_type, body_type
+                        ),
+                        None,
+                        location.clone(),
+                    ));
+                }
+
+                Ok(())
+            }
+            Statement::GenericFunction {
+                name,
+                generic_parameters,
+                parameters,
+                return_type,
+                body,
+            } => {
+                let mut generic_parameters_: Vec<String> = vec![];
+                for generic_parameter in generic_parameters {
+                    generic_parameters_.push(match generic_parameter {
+                        Type::GenericParameter(name, _) => name.clone(),
+                        _ => {
+                            return Err(HarmonyError::new(
+                                HarmonyErrorKind::Semantic,
+                                format!(
+                                    "Expected generic parameter, found '{}'",
+                                    generic_parameter
+                                ),
+                                None,
+                                generic_parameter.location(),
+                            ))
+                        }
+                    });
+                }
+
+                let function_id: FunctionId = self.global_scope.functions.len();
+                let (name, location) = name.clone();
+
+                let mut local_scope: LocalScope = LocalScope::new();
+                let mut parameter_types: Vec<Type> = Vec::new();
+                for parameter in parameters {
+                    let parameter_name: String = parameter.name.clone().0.clone();
+                    let parameter_type: Type = parameter.type_.clone();
+                    let ty: Type = self
+                        .check_type_generic(parameter_type.clone(), generic_parameters_.clone())?;
+                    if !generic_parameters.contains(&ty) {
+                        return Err(HarmonyError::new(
+                            HarmonyErrorKind::Semantic,
+                            format!(
+                                "Generic parameter '{}' not found in function '{}'",
+                                ty, name
+                            ),
+                            None,
+                            location.clone(),
+                        ));
+                    }
+                    parameter_types.push(ty.clone());
+                    local_scope.variables.insert(
+                        parameter_name.clone(),
+                        Variable {
+                            name: parameter_name.clone(),
+                            type_: ty,
+                            location: parameter.name.clone().1,
+                            value: None,
+                        },
+                    );
+                }
+
+                let return_type: Type = match return_type.clone() {
+                    Some(type_) => self.check_type_generic(type_, generic_parameters_)?,
+                    None => Type::Unit(location.clone()),
+                };
+                let body: Expression = body.clone();
+
+                let function: Function = Function {
+                    name: name.clone(),
+                    generic_parameters: generic_parameters.clone(),
                     parameters: parameters.clone(),
                     return_type: return_type.clone(),
                     body: Some(body.clone()),
@@ -463,6 +559,22 @@ impl Checker {
         }
     }
 
+    fn check_type_generic(
+        &mut self,
+        ty: Type,
+        generic_parameters: Vec<String>,
+    ) -> Result<Type, HarmonyError> {
+        match ty {
+            Type::Identifier(name, location) if generic_parameters.contains(&name) => {
+                Ok(Type::GenericParameter(name, location))
+            }
+            Type::List(inner) => Ok(Type::List(Some(Box::new(
+                self.check_type_generic(*inner.unwrap(), generic_parameters)?,
+            )))),
+            _ => Ok(ty),
+        }
+    }
+
     pub fn check_expression(
         &mut self,
         expression: &Expression,
@@ -506,6 +618,9 @@ impl Checker {
                             if let Type::Char(loc2) = right_type {
                                 return Ok(Type::Char(loc1.merge(&loc2)));
                             }
+                        }
+                        if let Type::GenericParameter(name, loc1) = left_type.clone() {
+                            return Ok(Type::GenericParameter(name, loc1));
                         }
                         return Err(HarmonyError::new(
                             HarmonyErrorKind::Semantic,
@@ -696,7 +811,11 @@ impl Checker {
                     expression.location(),
                 ));
             }
-            Expression::Call { callee, arguments } => {
+            Expression::Call {
+                callee,
+                generic_arguments,
+                arguments,
+            } => {
                 let callee: String = callee.0.clone();
                 if !self.global_scope.function_names.contains_key(&callee) {
                     if self.global_scope.enum_variants.contains_key(&callee) {
@@ -737,6 +856,44 @@ impl Checker {
                         }
                         return Ok(Type::Enum(name, expression.location().clone()));
                     }
+                    if local_scope.variables.contains_key(&callee) {
+                        let variable: Variable =
+                            local_scope.variables.get(&callee).unwrap().clone();
+                        if let Type::Function(types, return_type) = variable.type_ {
+                            if types.len() != arguments.len() {
+                                return Err(HarmonyError::new(
+                                    HarmonyErrorKind::Semantic,
+                                    format!(
+                                        "Function '{}' expects {} arguments, found {}",
+                                        callee,
+                                        types.len(),
+                                        arguments.len()
+                                    ),
+                                    None,
+                                    expression.location(),
+                                ));
+                            }
+                            for (i, argument) in arguments.iter().enumerate() {
+                                let argument_type =
+                                    self.check_expression(argument, &mut local_scope.clone())?;
+                                if argument_type != types.get(i).unwrap().clone() {
+                                    return Err(HarmonyError::new(
+                                        HarmonyErrorKind::Semantic,
+                                        format!(
+                                            "Function '{}' expects argument {} to have type '{}', found '{}'",
+                                            callee,
+                                            i + 1,
+                                            types.get(i).unwrap().clone(),
+                                            argument_type
+                                        ),
+                                        None,
+                                        expression.location(),
+                                    ));
+                                }
+                            }
+                            return Ok(*return_type.clone());
+                        }
+                    }
                     return Err(HarmonyError::new(
                         HarmonyErrorKind::Semantic,
                         format!("Function '{}' is not defined", callee),
@@ -758,6 +915,30 @@ impl Checker {
                     .clone()
                     .return_type
                     .clone();
+
+                if generic_arguments.len() > 0 {
+                    let generic_parameters: Vec<Type> = self
+                        .global_scope
+                        .functions
+                        .get(&function_id)
+                        .unwrap()
+                        .clone()
+                        .generic_parameters;
+                    if generic_arguments.len() != generic_parameters.len() {
+                        return Err(HarmonyError::new(
+                            HarmonyErrorKind::Semantic,
+                            format!(
+                                "Function '{}' expects {} generic arguments, found {}",
+                                callee,
+                                generic_parameters.len(),
+                                generic_arguments.len()
+                            ),
+                            None,
+                            expression.location(),
+                        ));
+                    }
+                }
+
                 let mut argument_types = Vec::new();
                 for argument in arguments {
                     let argument_type =
@@ -864,8 +1045,6 @@ impl Checker {
                         }
                     }
 
-                    println!("{:?}", case_type);
-                    println!("{:?}", expression_type);
                     if case_type != expression_type {
                         return Err(HarmonyError::new(
                             HarmonyErrorKind::Semantic,
@@ -1058,6 +1237,22 @@ impl Checker {
                 );
                 self.check_expression(body, &mut local_scope.clone())
             }
+            Expression::Function {
+                parameters,
+                return_type,
+                ..
+            } => {
+                let mut parameter_types = Vec::new();
+                for parameter in parameters {
+                    let parameter_type = parameter.type_.clone();
+                    parameter_types.push(parameter_type);
+                }
+                let function_type = Type::Function(
+                    parameter_types,
+                    Box::new(return_type.clone().unwrap().clone()),
+                );
+                Ok(function_type)
+            }
             _ => {
                 dbg!(expression);
                 todo!("check_expression")
@@ -1085,6 +1280,7 @@ pub struct Enum {
 pub struct Function {
     pub name: String,
     pub location: SourceLocation,
+    pub generic_parameters: Vec<Type>,
     pub parameters: Vec<Parameter>,
     pub return_type: Type,
     pub body: Option<Expression>,

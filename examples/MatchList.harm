@@ -1,12 +1,13 @@
 module MatchList
 
 import IO.Console as Console
-
-fun length(list: [int]) -> int =
-    case list of
-        | [] => 0
-        | [_, ..xs] => length (xs) + 1
-    end
+import Data.List as List
 
 fun main =
-    Console.println (length ([1, 2, 3, 4]))
+    let list = List.filter (
+            fun(x: int) -> bool = x % 2 == 0,
+            List.range (1, 10)) in
+    let reversed = List.reverse(list) in
+    Console.println (List.map (
+            fun(x: int) -> int = x * x,
+            reversed))

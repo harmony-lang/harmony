@@ -29,6 +29,13 @@ pub enum Statement {
         return_type: Option<Type>,
         body: Expression,
     },
+    GenericFunction {
+        name: (String, SourceLocation),
+        generic_parameters: Vec<Type>,
+        parameters: Vec<Parameter>,
+        return_type: Option<Type>,
+        body: Expression,
+    },
     Enum {
         name: (String, SourceLocation),
         variants: Vec<EnumVariant>,
@@ -53,6 +60,7 @@ pub enum Expression {
     },
     Call {
         callee: (String, SourceLocation),
+        generic_arguments: Vec<Type>,
         arguments: Vec<Expression>,
     },
     Identifier(String, SourceLocation),
@@ -87,6 +95,11 @@ pub enum Expression {
         value: Box<Expression>,
         body: Box<Expression>,
     },
+    Function {
+        parameters: Vec<Parameter>,
+        return_type: Option<Type>,
+        body: Box<Expression>,
+    },
 }
 
 impl Expression {
@@ -113,6 +126,7 @@ impl Expression {
                 expression.location().merge(&index.location())
             }
             Expression::Let { name, body, .. } => name.1.merge(&body.location()),
+            Expression::Function { body, .. } => body.location(),
         }
     }
 }
@@ -245,6 +259,34 @@ impl PartialEq for Type {
 
     fn ne(&self, other: &Self) -> bool {
         !self.eq(other)
+    }
+}
+
+impl Type {
+    pub fn location(&self) -> SourceLocation {
+        match self {
+            Type::Unit(l) => l.clone(),
+            Type::Int(l) => l.clone(),
+            Type::Float(l) => l.clone(),
+            Type::String(l) => l.clone(),
+            Type::Bool(l) => l.clone(),
+            Type::Char(l) => l.clone(),
+            Type::Generic(_, l, _) => l.clone(),
+            Type::GenericParameter(_, l) => l.clone(),
+            Type::GenericArgument(_, l) => l.clone(),
+            Type::List(type_) => {
+                if let Some(type_) = type_.as_ref() {
+                    type_.location()
+                } else {
+                    SourceLocation::default()
+                }
+            }
+            Type::Function(_, return_type) => return_type.location(),
+            Type::Any(l) => l.clone(),
+            Type::Enum(_, l) => l.clone(),
+            Type::GenericEnum(_, l, _) => l.clone(),
+            Type::Identifier(_, l) => l.clone(),
+        }
     }
 }
 

@@ -118,6 +118,24 @@ impl Parser {
         self.expect(TokenKind::Fun)?;
         let location: SourceLocation = self.current()?.location;
         let name = self.expect(TokenKind::Identifier)?.lexeme;
+        let mut generic_parameters: Vec<Type> = vec![];
+        if !self.is_at_end() && self.current()?.kind == TokenKind::LessThan {
+            self.expect(TokenKind::LessThan)?;
+            let location: SourceLocation = self.current()?.location;
+            generic_parameters.push(Type::GenericParameter(
+                self.expect(TokenKind::Identifier)?.lexeme,
+                location,
+            ));
+            while !self.is_at_end() && self.current()?.kind == TokenKind::Comma {
+                self.expect(TokenKind::Comma)?;
+                let location: SourceLocation = self.current()?.location;
+                generic_parameters.push(Type::GenericParameter(
+                    self.expect(TokenKind::Identifier)?.lexeme,
+                    location,
+                ));
+            }
+            self.expect(TokenKind::GreaterThan)?;
+        }
         let mut parameters: Vec<Parameter> = vec![];
         let mut return_type: Option<Type> = None;
         if !self.is_at_end() && self.current()?.kind == TokenKind::OpenParenthesis {
@@ -149,6 +167,15 @@ impl Parser {
         }
         self.expect(TokenKind::Equals)?;
         let body = self.parse_expression()?;
+        if generic_parameters.len() > 0 {
+            return Ok(Statement::GenericFunction {
+                name: (name, location),
+                generic_parameters,
+                parameters,
+                return_type,
+                body,
+            });
+        }
         Ok(Statement::Function {
             name: (name, location),
             parameters,
@@ -367,7 +394,17 @@ impl Parser {
             TokenKind::Identifier => {
                 let location: SourceLocation = self.current()?.location;
                 let identifier = self.expect(TokenKind::Identifier)?.lexeme;
-                if !self.is_at_end() && self.current()?.kind == TokenKind::OpenParenthesis {
+                if !self.is_at_end() && self.current()?.kind == TokenKind::LessThan {
+                    self.expect(TokenKind::LessThan)?;
+                    let mut generic_arguments: Vec<Type> = vec![];
+                    if !self.is_at_end() && self.current()?.kind != TokenKind::GreaterThan {
+                        generic_arguments.push(self.parse_type()?);
+                        while !self.is_at_end() && self.current()?.kind == TokenKind::Comma {
+                            self.expect(TokenKind::Comma)?;
+                            generic_arguments.push(self.parse_type()?);
+                        }
+                    }
+                    self.expect(TokenKind::GreaterThan)?;
                     self.expect(TokenKind::OpenParenthesis)?;
                     let mut arguments: Vec<Expression> = vec![];
                     if !self.is_at_end() && self.current()?.kind != TokenKind::CloseParenthesis {
@@ -380,6 +417,23 @@ impl Parser {
                     self.expect(TokenKind::CloseParenthesis)?;
                     Ok(Expression::Call {
                         callee: (identifier, location),
+                        generic_arguments,
+                        arguments,
+                    })
+                } else if !self.is_at_end() && self.current()?.kind == TokenKind::OpenParenthesis {
+                    self.expect(TokenKind::OpenParenthesis)?;
+                    let mut arguments: Vec<Expression> = vec![];
+                    if !self.is_at_end() && self.current()?.kind != TokenKind::CloseParenthesis {
+                        arguments.push(self.parse_expression()?);
+                        while !self.is_at_end() && self.current()?.kind == TokenKind::Comma {
+                            self.expect(TokenKind::Comma)?;
+                            arguments.push(self.parse_expression()?);
+                        }
+                    }
+                    self.expect(TokenKind::CloseParenthesis)?;
+                    Ok(Expression::Call {
+                        callee: (identifier, location),
+                        generic_arguments: vec![],
                         arguments,
                     })
                 } else if !self.is_at_end() && self.current()?.kind == TokenKind::Dot {
@@ -509,6 +563,45 @@ impl Parser {
                     body: Box::new(body),
                 })
             }
+            TokenKind::Fun => {
+                self.expect(TokenKind::Fun)?;
+                let mut parameters: Vec<Parameter> = vec![];
+                let mut return_type: Option<Type> = None;
+                if !self.is_at_end() && self.current()?.kind == TokenKind::OpenParenthesis {
+                    self.expect(TokenKind::OpenParenthesis)?;
+                    if !self.is_at_end() && self.current()?.kind == TokenKind::Identifier {
+                        let location: SourceLocation = self.current()?.location;
+                        let identifier = self.expect(TokenKind::Identifier)?.lexeme;
+                        self.expect(TokenKind::Colon)?;
+                        let type_ = self.parse_type()?;
+                        parameters.push(Parameter {
+                            name: (identifier, location),
+                            type_,
+                        });
+                        while !self.is_at_end() && self.current()?.kind == TokenKind::Comma {
+                            self.expect(TokenKind::Comma)?;
+                            let location: SourceLocation = self.current()?.location;
+                            let identifier = self.expect(TokenKind::Identifier)?.lexeme;
+                            self.expect(TokenKind::Colon)?;
+                            let type_ = self.parse_type()?;
+                            parameters.push(Parameter {
+                                name: (identifier, location),
+                                type_,
+                            });
+                        }
+                    }
+                    self.expect(TokenKind::CloseParenthesis)?;
+                    self.expect(TokenKind::Arrow)?;
+                    return_type = Some(self.parse_type()?);
+                }
+                self.expect(TokenKind::Equals)?;
+                let body = self.parse_expression()?;
+                Ok(Expression::Function {
+                    parameters,
+                    return_type,
+                    body: Box::new(body),
+                })
+            }
             _ => Err(HarmonyError::new(
                 HarmonyErrorKind::Syntax,
                 format!("Expected expression, found {:?}", self.current()?.kind),
@@ -587,6 +680,20 @@ impl Parser {
                 let inner_type: Type = self.parse_type()?;
                 self.expect(TokenKind::CloseBracket)?;
                 Ok(Type::List(Some(Box::new(inner_type))))
+            }
+            TokenKind::Fun => {
+                self.expect(TokenKind::Fun)?;
+                self.expect(TokenKind::OpenParenthesis)?;
+                let mut parameters: Vec<Type> = vec![];
+                parameters.push(self.parse_type()?);
+                while !self.is_at_end() && self.current()?.kind == TokenKind::Comma {
+                    self.expect(TokenKind::Comma)?;
+                    parameters.push(self.parse_type()?);
+                }
+                self.expect(TokenKind::CloseParenthesis)?;
+                self.expect(TokenKind::Arrow)?;
+                let return_type: Type = self.parse_type()?;
+                Ok(Type::Function(parameters, Box::new(return_type)))
             }
             _ => Err(HarmonyError::new(
                 HarmonyErrorKind::Syntax,

@@ -1,0 +1,40 @@
+module Data.List
+
+fun length<T>(list: [T]) -> T =
+    case list of
+        | [] => 0
+        | [_, ..xs] => length (xs) + 1
+    end
+
+fun map<T>(f: fun(T) -> T, list: [T]) -> [T] =
+    case list of
+        | [] => []
+        | [x, ..xs] => [f (x), ..map (f, xs)]
+    end
+
+fun filter<T>(f: fun(T) -> bool, list: [T]) -> [T] =
+    case list of
+        | [] => []
+        | [x, ..xs] =>
+            if f (x) then [x, ..filter (f, xs)]
+            else filter (f, xs)
+    end
+
+fun range(from: int, to: int) -> [int] =
+    if from > to then []
+    else [from, ..range (from + 1, to)]
+
+fun foldl<T, U>(f: fun(T, U) -> U, acc: U, list: [T]) -> U =
+    case list of
+        | [] => acc
+        | [x, ..xs] => foldl (f, f (x, acc), xs)
+    end
+
+fun foldr<T, U>(f: fun(T, U) -> U, acc: U, list: [T]) -> U =
+    case list of
+        | [] => acc
+        | [x, ..xs] => f (x, foldr (f, acc, xs))
+    end
+
+fun reverse<T>(list: [T]) -> [T] =
+    foldl (fun (x: T, acc: [T]) -> T = [x, ..acc], [], list)
