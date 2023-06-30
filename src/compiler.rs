@@ -12,6 +12,7 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct Compiler {
+    pub args: Vec<String>,
     pub options: CompilerOptions,
     pub files: Vec<String>,
     pub root: PathBuf,
@@ -19,8 +20,9 @@ pub struct Compiler {
 }
 
 impl Compiler {
-    pub fn new(options: &CompilerOptions, files: &Vec<String>) -> Compiler {
+    pub fn new(options: &CompilerOptions, files: &Vec<String>, args: Vec<String>) -> Compiler {
         Compiler {
+            args: args.clone(),
             options: options.clone(),
             files: files.clone(),
             root: std::env::current_dir().unwrap(),
@@ -32,6 +34,12 @@ impl Compiler {
         for file in self.files.clone() {
             if let ControlFlow::Break(_) = self.compile_file(&file, false) {
                 continue;
+            }
+        }
+
+        for file in self.compiled_files.keys() {
+            if !self.options.keep {
+                std::fs::remove_file(file.clone().replace(".harm", ".mjs")).unwrap();
             }
         }
     }
@@ -139,6 +147,9 @@ impl Compiler {
         command.arg("--harmony");
         command.arg("--use-strict");
         command.arg(file.clone().replace(".harm", ".mjs"));
+        for arg in self.args.clone() {
+            command.arg(arg);
+        }
         if command.output().unwrap().status.success() {
             println!(
                 " => {}",
@@ -150,10 +161,6 @@ impl Compiler {
                 " => {}",
                 String::from_utf8(command.output().unwrap().stderr).unwrap()
             );
-        }
-
-        if !self.options.keep {
-            std::fs::remove_file(file.clone().replace(".harm", ".mjs")).unwrap();
         }
 
         ControlFlow::Continue(())

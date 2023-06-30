@@ -1,0 +1,4 @@
+module System.Environment
+
+foreign fun args() -> [string] =
+    "process.argv.slice(2)"

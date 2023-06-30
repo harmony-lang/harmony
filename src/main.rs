@@ -13,11 +13,8 @@ fn usage() {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let files: Vec<String> = args
-        .iter()
-        .filter(|&arg| !arg.starts_with("-") && !arg.starts_with("--"))
-        .map(|arg| arg.to_string())
-        .collect();
+    let file = args.get(0).unwrap();
+    let args = args.iter().skip(1).collect::<Vec<&String>>();
     let options: Vec<String> = args
         .iter()
         .filter(|&arg| arg.starts_with("-") || arg.starts_with("--"))
@@ -33,13 +30,15 @@ fn main() {
         return;
     }
 
-    if files.len() == 0 {
-        usage();
-        return;
-    }
+    // get all arguments that are after the file name and options
+    let args: Vec<String> = args
+        .iter()
+        .skip_while(|&arg| arg.starts_with("-") || arg.starts_with("--"))
+        .map(|arg| arg.to_string())
+        .collect();
 
     let compiler_options: CompilerOptions = CompilerOptions::new(options);
-    let mut compiler: Compiler = Compiler::new(&compiler_options, &files);
+    let mut compiler: Compiler = Compiler::new(&compiler_options, &vec![file.to_string()], args);
 
     compiler.compile();
 }

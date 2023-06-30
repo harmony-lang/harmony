@@ -8,6 +8,7 @@ import IO.File as File
 import Data.Maybe as Maybe exposing (Just, Nothing)
 import Data.String as String
 import Data.Char as Char
+import System.Environment as Environment
 
 enum Token
     -- Literals
@@ -113,7 +114,8 @@ fun parse(nodes: [AstNode], tokens: [Token], i: int) -> [AstNode] =
     end
 
 fun main =
-    let file = File.read $ "examples/LetIn.harm" in
+    let filename = Environment.args()[0] in
+    let file = File.read $ filename in
     let tokens: [Token] = tokenize $ file in
     let ast = parse ([], tokens, 0) in
     Console.println $ ast
