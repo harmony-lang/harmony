@@ -846,7 +846,11 @@ impl Checker {
                         for (i, argument) in arguments.iter().enumerate() {
                             if let Expression::Identifier(id, location) = argument.clone() {
                                 for variant in enum_.variants.clone() {
-                                    if let EnumVariant::Tuple(_, _, types) = variant {
+                                    println!("{:?}", variant);
+                                    if let EnumVariant::Tuple(name, _, types) = variant {
+                                        if name != callee {
+                                            continue;
+                                        }
                                         let ty: Type = types.get(i).unwrap().clone();
                                         local_scope.variables.insert(
                                             id.clone(),

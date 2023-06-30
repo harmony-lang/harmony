@@ -99,7 +99,8 @@ impl Codegen {
                         EnumVariant::Unit(name, _) => {
                             self.names.push(name.clone());
                             code.push_str(
-                                format!("    {}: {{ \"{}\": undefined }},\n", name, name).as_str(),
+                                format!("    {}: {{ \"{}\": \"{}\" }},\n", name, name, name)
+                                    .as_str(),
                             );
                         }
                         EnumVariant::Tuple(name, _, types) => {
@@ -145,7 +146,8 @@ impl Codegen {
                         EnumVariant::Unit(name, _) => {
                             self.names.push(name.clone());
                             code.push_str(
-                                format!("    {}: {{ \"{}\": undefined }},\n", name, name).as_str(),
+                                format!("    {}: {{ \"{}\": \"{}\" }},\n", name, name, name)
+                                    .as_str(),
                             );
                         }
                         EnumVariant::Tuple(name, _, types) => {
@@ -369,13 +371,13 @@ impl Codegen {
                     } else if let Expression::Identifier(id, _) = pattern.clone() {
                         if self.checker.global_scope.enum_variants.contains_key(&id) {
                             code.push_str(
-                                format!("    if (__condition.{} === undefined) {{\n", id.clone())
+                                format!("    if (__condition.{} !== undefined) {{\n", id.clone())
                                     .as_str(),
                             );
                         } else {
                             code.push_str(
                                 format!(
-                                    "    if (__condition === {}) {{\n",
+                                    "    if (__condition !== {}) {{\n",
                                     self.generate_expression(&pattern)
                                 )
                                 .as_str(),
@@ -456,7 +458,23 @@ impl Codegen {
             }
             Expression::Access { name, member } => {
                 let name: String = name.0.clone();
-                let member: String = self.generate_expression(&*member);
+                let member: String = match *member.clone() {
+                    Expression::Call {
+                        callee, arguments, ..
+                    } => {
+                        let mut code: String = String::new();
+                        code.push_str(format!("{}(", callee.0.clone()).as_str());
+                        for (i, argument) in arguments.iter().enumerate() {
+                            if i > 0 {
+                                code.push_str(", ");
+                            }
+                            code.push_str(self.generate_expression(argument).as_str());
+                        }
+                        code.push_str(")");
+                        code
+                    }
+                    _ => self.generate_expression(&*member),
+                };
                 format!("{}.{}", name, member)
             }
             Expression::Bool(value, _) => value.clone().to_string(),

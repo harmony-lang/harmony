@@ -136,6 +136,8 @@ impl Compiler {
         }
 
         let mut command: Command = Command::new("node");
+        command.arg("--harmony");
+        command.arg("--use-strict");
         command.arg(file.clone().replace(".harm", ".mjs"));
         if command.output().unwrap().status.success() {
             println!(

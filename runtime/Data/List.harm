@@ -1,5 +1,7 @@
 module Data.List
 
+import Data.Maybe as Maybe
+
 fun length<T>(list: [T]) -> T =
     case list of
         | [] => 0
@@ -38,3 +40,11 @@ fun foldr<T, U>(f: fun(T, U) -> U, acc: U, list: [T]) -> U =
 
 fun reverse<T>(list: [T]) -> [T] =
     foldl (fun (x: T, acc: [T]) -> T = [x, ..acc], [], list)
+
+fun at<T>(list: [T], index: int) -> Maybe<T> =
+    case list of
+        | [] => Nothing
+        | [x, ..xs] =>
+            if index == 0 then Just $ x
+            else Just $ at (xs, index - 1)
+    end
