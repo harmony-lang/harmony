@@ -43,6 +43,7 @@ impl Tokenizer {
                 ')' => self.add_token(TokenKind::CloseParenthesis, c.to_string()),
                 '[' => self.add_token(TokenKind::OpenBracket, c.to_string()),
                 ']' => self.add_token(TokenKind::CloseBracket, c.to_string()),
+                '$' => self.add_token(TokenKind::Dollar, c.to_string()),
                 '.' => {
                     if self.peek() == Some('.') {
                         self.next();

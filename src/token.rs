@@ -92,6 +92,7 @@ pub enum TokenKind {
     Colon,            // :
     DoubleColon,      // ::   (list constructor (cons))
     Pipe,             // |
+    Dollar,           // $
     Arrow,            // ->
     FatArrow,         // =>
 
@@ -161,6 +162,7 @@ impl Display for TokenKind {
             TokenKind::Colon => write!(f, ":"),
             TokenKind::DoubleColon => write!(f, "::"),
             TokenKind::Pipe => write!(f, "|"),
+            TokenKind::Dollar => write!(f, "$"),
             TokenKind::Arrow => write!(f, "->"),
             TokenKind::FatArrow => write!(f, "=>"),
             TokenKind::Plus => write!(f, "+"),

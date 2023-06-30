@@ -3,7 +3,7 @@
 * [ ] `do` expressions
 * [ ] default values for function parameters
 * [ ] named parameters for function calls
-* [ ] support for function calls without parentheses, only with one argument (ex. `foo "bar"`)
+* [x] support for function calls without parentheses, only with one argument (ex. `foo $ "bar"`)
 
 ## Bugs
 

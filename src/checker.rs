@@ -760,6 +760,20 @@ impl Checker {
                     }
                     return Ok(Type::Enum(name, location.clone()));
                 }
+                if let Some(function_id) = self.global_scope.function_names.get(identifier) {
+                    let function: Function = self
+                        .global_scope
+                        .functions
+                        .get(&function_id)
+                        .unwrap()
+                        .clone();
+                    let types: Vec<Type> = function
+                        .parameters
+                        .iter()
+                        .map(|parameter| parameter.type_.clone())
+                        .collect();
+                    return Ok(Type::Function(types, Box::new(function.return_type)));
+                }
                 return Err(HarmonyError::new(
                     HarmonyErrorKind::Semantic,
                     format!("Variable '{}' is not defined", identifier),

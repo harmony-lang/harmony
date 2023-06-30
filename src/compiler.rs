@@ -149,6 +149,11 @@ impl Compiler {
                 String::from_utf8(command.output().unwrap().stderr).unwrap()
             );
         }
+
+        if !self.options.keep {
+            std::fs::remove_file(file.clone().replace(".harm", ".mjs")).unwrap();
+        }
+
         ControlFlow::Continue(())
     }
 }

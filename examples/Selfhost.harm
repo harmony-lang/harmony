@@ -39,34 +39,24 @@ enum Token
 
 fun tokenize_identifier(s: string, i: int, identifier: string) -> Token =
     case String.get (s, i) of
-        | Just (c) if Char.isAlphabetic (c) => tokenize_identifier (s, i + 1, identifier ++ c)
+        | Just (c) if Char.isAlphabetic $ c => tokenize_identifier (s, i + 1, identifier ++ c)
         | else => TkIdentifier (identifier)
     end
 
 fun tokenize_(s: string, i: int, tokens: [Token]) -> Maybe<[Token]> =
-    case String.length (s) of
+    case String.length $ s of
         | 0 => Just (tokens ++ [TkEOF])
         | else => case String.get (s, i) of
             | Just (c) if c == ' ' => tokenize_ (s, i + 1, tokens)
-            | Just (c) if Char.isAlphabetic (c) =>
+            | Just (c) if Char.isAlphabetic $ c =>
                 let token = tokenize_identifier (s, i, "") in
                 case token of
-                    | TkIdentifier (str) if str == "module"   => tokenize_ (s, i + String.length (str), tokens ++ [TkModule])
-                    | TkIdentifier (str) if str == "import"   => tokenize_ (s, i + String.length (str), tokens ++ [TkImport])
-                    | TkIdentifier (str) if str == "as"       => tokenize_ (s, i + String.length (str), tokens ++ [TkAs])
-                    | TkIdentifier (str) if str == "exposing" => tokenize_ (s, i + String.length (str), tokens ++ [TkExposing])
-                    | TkIdentifier (str) if str == "foreign"  => tokenize_ (s, i + String.length (str), tokens ++ [TkForeign])
-                    | TkIdentifier (str) if str == "enum"     => tokenize_ (s, i + String.length (str), tokens ++ [TkEnum])
-                    | TkIdentifier (str) if str == "fun"      => tokenize_ (s, i + String.length (str), tokens ++ [TkFun])
-                    | TkIdentifier (str) if str == "case"     => tokenize_ (s, i + String.length (str), tokens ++ [TkCase])
-                    | TkIdentifier (str) if str == "of"       => tokenize_ (s, i + String.length (str), tokens ++ [TkOf])
-                    | TkIdentifier (str) if str == "end"      => tokenize_ (s, i + String.length (str), tokens ++ [TkEnd])
-                    | TkIdentifier (str) if str == "if"       => tokenize_ (s, i + String.length (str), tokens ++ [TkIf])
-                    | TkIdentifier (str) if str == "then"     => tokenize_ (s, i + String.length (str), tokens ++ [TkThen])
-                    | TkIdentifier (str) if str == "else"     => tokenize_ (s, i + String.length (str), tokens ++ [TkElse])
-                    | TkIdentifier (str) if str == "let"      => tokenize_ (s, i + String.length (str), tokens ++ [TkLet])
-                    | TkIdentifier (str) if str == "in"       => tokenize_ (s, i + String.length (str), tokens ++ [TkIn])
-                    | TkIdentifier (str) => tokenize_ (s, i + String.length (str), tokens ++ [token])
+                    | TkIdentifier (str) => let len = String.length $ str in 
+                    case str of
+                        | "module" => tokenize_ (s, i + len, tokens ++ [TkModule])
+                        | else => tokenize_ (s, i + len, tokens ++ [token])
+                    end
+                    | else => tokenize_ (s, i + 1, tokens ++ [token])
                 end
             | Just (c) => case c of
                 | '(' => tokenize_ (s, i + 1, tokens ++ [TkOpenParen])
@@ -85,5 +75,5 @@ fun tokenize(s: string) -> Maybe<[Token]> =
     tokenize_(s, 0, [])
 
 fun main =
-    let tokens = tokenize ("module abc ( ) -> -") in
-    Console.println (tokens)
+    let tokens = tokenize $ "module abc ( ) -> -" in
+    Console.println $ tokens
